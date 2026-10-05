@@ -1,5 +1,15 @@
 # Codex chunking review — 2026-10-05
 
+## Re-review of 06f389b: findings closed for bounded live comparison
+
+Codex reviewed the changes and independently repeated the original reproductions: both 100 PLN obligations and both same-date events survive merge; the unsupported USD/yearly claim is rejected; absent evidence raises InvalidModelOutput instead of disappearing. Grounding now runs inside the shared correction budget. Ruff lint/format passed; 331 backend tests passed (unchanged local-socket CLI test file excluded in this run). Frontend unchanged since the prior successful check. No AI calls used. These findings are closed; this is permission to evaluate the experimental mode, not a claim of semantic correctness or production readiness.
+
+Next Claude checkpoint: run ONE analysis of the sample contract with AI_MODE=chunked, after checking available free quota, using the existing input and default 55-second overall deadline. It should plan 3 chunks + overview, maximum FIVE started provider calls including the one shared corrective retry. If planning exceeds this cap, stop before calling. Count actual starts, including cancelled calls; do not increase concurrency, token cap or deadlines to force success. Do not repeat automatically or change model/prompt mid-experiment. Keep the committed default single; local override only, restore afterward. No publication or paid changes.
+
+Record per-call label, timing, completion/finish reason where available, known token usage and safe validation field paths/reasons (no source text in normal logs). Preserve request/result under ignored .local/. Run evaluator v3 on any result, then actually review summary, key points, contexts and Polish fidelity against source; record specific errors, do not simply mark all manual dimensions pass. Report failure precisely if timeout/invalid evidence/output happens, including which phase and how many calls completed. Update LIVE_AI_RESULTS, STATUS and AI_LOG with a focused commit, then return for architectural decision. A failed trial is useful evidence; do not conceal it by weakening grounding or dropping facts.
+
+After this trial we must decide the final approach from observed quality, latency and quota; do not continue speculative chunking expansion. History, OCR and deployment remain unfinished.
+
 Reviewed 99a2f20. Working tree clean before review. Independent checks: backend Ruff lint/format passed, 311 pytest tests passed excluding tests/test_run_live_check.py (socket-based CLI tests unchanged, previously reviewed); frontend lint/typecheck, 81 tests and build passed. No provider calls. Experimental opt-in status and unchanged single-call default are correct. Chunk mode is NOT yet accepted for live testing.
 
 ## P1 — merging drops distinct obligations/events
