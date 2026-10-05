@@ -1,0 +1,127 @@
+{
+  "description": "Hand-written factual reference answer for synthetic_offer_pl, written from the case text only (not from any model output). Used to test that a correct answer passes every automatic check and still needs manual review.",
+  "result": {
+    "document": {
+      "fileName": "Oferta_OF-2026-087_EnergyWatch.pdf",
+      "pages": 4,
+      "language": "pl",
+      "type": "oferta",
+      "title": "Oferta handlowa nr OF/2026/087 na dostawę i utrzymanie platformy monitoringu energii EnergyWatch",
+      "date": "2026-09-04"
+    },
+    "summary": "Baltic Data Systems sp. z o.o. składa spółce Zielony Port S.A. ofertę handlową nr OF/2026/087 na wdrożenie i utrzymanie platformy monitoringu energii EnergyWatch w trzech terminalach. Wdrożenie kosztuje 96 000,00 zł netto, a licencja chmurowa 1 450 EUR netto miesięcznie. Oferta jest ważna do 31 października 2026 roku, a prace mają się rozpocząć 2 listopada 2026 roku.",
+    "keyPoints": [
+      "Wdrożenie platformy w trzech terminalach kosztuje 96 000,00 zł netto, czyli 118 080,00 zł brutto.",
+      "Licencja EnergyWatch Cloud kosztuje 1 450 EUR netto miesięcznie, a wsparcie techniczne 54 000,00 zł netto rocznie.",
+      "Zaliczka wynosi 30% wynagrodzenia za wdrożenie, czyli 28 800,00 zł netto.",
+      "Wariant B z czujnikami bezprzewodowymi za 141 500,00 zł netto został odrzucony przez Adresata.",
+      "Za opóźnienie odbioru końcowego przewidziano karę 400,00 zł za każdy dzień, łącznie nie więcej niż 20 000,00 zł."
+    ],
+    "entities": {
+      "organizations": [
+        "Baltic Data Systems sp. z o.o.",
+        "Zielony Port S.A."
+      ],
+      "people": [
+        "Joanna Wróbel"
+      ]
+    },
+    "amounts": [
+      {
+        "value": 96000,
+        "currency": "PLN",
+        "context": "Wdrożenie platformy w 3 terminalach, netto, płatne jednorazowo"
+      },
+      {
+        "value": 22080,
+        "currency": "PLN",
+        "context": "Podatek VAT 23% od wdrożenia"
+      },
+      {
+        "value": 118080,
+        "currency": "PLN",
+        "context": "Wdrożenie razem, brutto"
+      },
+      {
+        "value": 1450,
+        "currency": "EUR",
+        "context": "Licencja EnergyWatch Cloud za wszystkie terminale, netto miesięcznie"
+      },
+      {
+        "value": 54000,
+        "currency": "PLN",
+        "context": "Wsparcie techniczne 24/7, netto rocznie, płatne z góry"
+      },
+      {
+        "value": 7800,
+        "currency": "PLN",
+        "context": "Szkolenie operatorów (2 dni), netto, jednorazowo"
+      },
+      {
+        "value": 28800,
+        "currency": "PLN",
+        "context": "Zaliczka 30% wynagrodzenia za wdrożenie, netto, płatna w ciągu 14 dni od podpisania umowy"
+      },
+      {
+        "value": 141500,
+        "currency": "PLN",
+        "context": "Wariant B z czujnikami bezprzewodowymi, netto, odrzucony przez Adresata"
+      },
+      {
+        "value": 750000,
+        "currency": "PLN",
+        "context": "Kapitał zakładowy Oferenta"
+      },
+      {
+        "value": 400,
+        "currency": "PLN",
+        "context": "Kara umowna za każdy dzień opóźnienia w odbiorze końcowym"
+      },
+      {
+        "value": 20000,
+        "currency": "PLN",
+        "context": "Maksymalna łączna kara umowna za opóźnienie w odbiorze końcowym"
+      }
+    ],
+    "dates": [
+      {
+        "date": "2026-09-04",
+        "context": "Data sporządzenia oferty"
+      },
+      {
+        "date": "2026-10-31",
+        "context": "Koniec ważności oferty"
+      },
+      {
+        "date": "2026-07-21",
+        "context": "Zapytanie ofertowe Adresata"
+      },
+      {
+        "date": "2026-08-12",
+        "context": "Wycena odrzuconego wariantu B"
+      },
+      {
+        "date": "2026-11-02",
+        "context": "Rozpoczęcie prac"
+      },
+      {
+        "date": "2027-02-26",
+        "context": "Termin odbioru końcowego"
+      }
+    ],
+    "keywords": [
+      "oferta handlowa",
+      "monitoring energii",
+      "EnergyWatch",
+      "wdrożenie",
+      "licencja chmurowa"
+    ],
+    "analysis": {
+      "complete": false,
+      "pagesWithoutText": [
+        4
+      ],
+      "titleFallback": false
+    }
+  }
+}

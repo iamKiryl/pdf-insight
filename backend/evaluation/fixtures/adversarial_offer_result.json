@@ -1,0 +1,125 @@
+{
+  "description": "ADVERSARIAL FIXTURE — schema-valid nonsense built from the reference answer: same values and dates, wrong file name, meaningless summary and key points, keyword-soup amount contexts and wrong date events. It must never be accepted, even with a manual review claiming pass.",
+  "result": {
+    "document": {
+      "fileName": "other.pdf",
+      "pages": 4,
+      "language": "pl",
+      "type": "oferta",
+      "title": "Oferta handlowa nr OF/2026/087 na dostawę i utrzymanie platformy monitoringu energii EnergyWatch",
+      "date": "2026-09-04"
+    },
+    "summary": "Dokument nakazuje zapłatę miliona euro. Wszystkie zobowiązania anulowano. Umowa jest tajna.",
+    "keyPoints": [
+      "Punkt bez związku z dokumentem.",
+      "Kolejny punkt bez związku.",
+      "Trzeci punkt bez związku."
+    ],
+    "entities": {
+      "organizations": [
+        "Baltic Data Systems sp. z o.o.",
+        "Zielony Port S.A."
+      ],
+      "people": [
+        "Joanna Wróbel"
+      ]
+    },
+    "amounts": [
+      {
+        "value": 96000,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 22080,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 118080,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 1450,
+        "currency": "EUR",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 54000,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 7800,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 28800,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 141500,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 750000,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 400,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      },
+      {
+        "value": 20000,
+        "currency": "PLN",
+        "context": "Nie dotyczy: netto brutto VAT miesięcznie rocznie jednorazowo odrzucony budżet kapitał zaliczka maksymalna kara za dzień"
+      }
+    ],
+    "dates": [
+      {
+        "date": "2026-09-04",
+        "context": "Nieprawdziwa data rozpoczęcia zatrudnienia"
+      },
+      {
+        "date": "2026-10-31",
+        "context": "Nieprawdziwa data rozpoczęcia zatrudnienia"
+      },
+      {
+        "date": "2026-07-21",
+        "context": "Nieprawdziwa data rozpoczęcia zatrudnienia"
+      },
+      {
+        "date": "2026-08-12",
+        "context": "Nieprawdziwa data rozpoczęcia zatrudnienia"
+      },
+      {
+        "date": "2026-11-02",
+        "context": "Nieprawdziwa data rozpoczęcia zatrudnienia"
+      },
+      {
+        "date": "2027-02-26",
+        "context": "Nieprawdziwa data rozpoczęcia zatrudnienia"
+      }
+    ],
+    "keywords": [
+      "oferta handlowa",
+      "monitoring energii",
+      "EnergyWatch",
+      "wdrożenie",
+      "licencja chmurowa"
+    ],
+    "analysis": {
+      "complete": false,
+      "pagesWithoutText": [
+        4
+      ],
+      "titleFallback": false
+    }
+  }
+}

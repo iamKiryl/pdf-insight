@@ -53,6 +53,8 @@
         "value": 96000,
         "currency": "PLN",
         "label": "implementation",
+        "page": 2,
+        "evidence": "Wdrożenie platformy w 3 terminalach | 96 000,00 zł netto | płatne jednorazowo",
         "qualifiers": [
           "net",
           "one-off"
@@ -62,6 +64,8 @@
         "value": 22080,
         "currency": "PLN",
         "label": "VAT on implementation",
+        "page": 2,
+        "evidence": "Podatek VAT 23% od wdrożenia | 22 080,00 zł",
         "qualifiers": [
           "vat"
         ]
@@ -70,6 +74,8 @@
         "value": 118080,
         "currency": "PLN",
         "label": "implementation gross",
+        "page": 2,
+        "evidence": "Wdrożenie razem | 118 080,00 zł brutto",
         "qualifiers": [
           "gross"
         ]
@@ -78,6 +84,8 @@
         "value": 1450,
         "currency": "EUR",
         "label": "cloud licence",
+        "page": 2,
+        "evidence": "Licencja EnergyWatch Cloud | 1 450 EUR netto miesięcznie",
         "qualifiers": [
           "net",
           "monthly"
@@ -87,6 +95,8 @@
         "value": 54000,
         "currency": "PLN",
         "label": "support",
+        "page": 2,
+        "evidence": "Wsparcie techniczne 24/7 | 54 000,00 zł netto rocznie",
         "qualifiers": [
           "net",
           "yearly"
@@ -96,6 +106,8 @@
         "value": 7800,
         "currency": "PLN",
         "label": "training",
+        "page": 2,
+        "evidence": "Szkolenie operatorów (2 dni) | 7 800,00 zł netto | jednorazowo",
         "qualifiers": [
           "net",
           "one-off"
@@ -105,6 +117,8 @@
         "value": 28800,
         "currency": "PLN",
         "label": "advance",
+        "page": 2,
+        "evidence": "tj. 28 800,00 zł netto, jest płatna w terminie 14 dni od podpisania umowy",
         "qualifiers": [
           "advance",
           "net"
@@ -114,6 +128,8 @@
         "value": 141500,
         "currency": "PLN",
         "label": "rejected variant B",
+        "page": 2,
+        "evidence": "w kwocie 141 500,00 zł netto został odrzucony przez Adresata",
         "qualifiers": [
           "rejected",
           "net"
@@ -123,6 +139,8 @@
         "value": 750000,
         "currency": "PLN",
         "label": "share capital",
+        "page": 1,
+        "evidence": "kapitał zakładowy: 750 000,00 zł",
         "qualifiers": [
           "capital"
         ]
@@ -131,6 +149,8 @@
         "value": 400,
         "currency": "PLN",
         "label": "penalty per day",
+        "page": 3,
+        "evidence": "wynosi 400,00 zł za każdy dzień opóźnienia",
         "qualifiers": [
           "penalty",
           "daily"
@@ -140,6 +160,8 @@
         "value": 20000,
         "currency": "PLN",
         "label": "penalty cap",
+        "page": 3,
+        "evidence": "łącznie nie więcej niż 20 000,00 zł",
         "qualifiers": [
           "maximum"
         ]
@@ -148,27 +170,84 @@
     "dates": [
       {
         "date": "2026-09-04",
-        "label": "offer issue"
+        "label": "offer issue",
+        "page": 1,
+        "evidence": "Warszawa, dnia 4 września 2026 r.",
+        "event": [
+          [
+            "sporządz",
+            "wystaw",
+            "złożen",
+            "podpis",
+            "data oferty",
+            "dzień oferty"
+          ],
+          [
+            "ofert"
+          ]
+        ]
       },
       {
         "date": "2026-10-31",
-        "label": "validity end"
+        "label": "offer validity end",
+        "page": 1,
+        "evidence": "Oferta jest ważna do dnia 31 października 2026 r.",
+        "event": [
+          [
+            "ważn",
+            "związan"
+          ]
+        ]
       },
       {
         "date": "2026-07-21",
-        "label": "request for proposal"
+        "label": "request for proposal",
+        "page": 1,
+        "evidence": "zapytania ofertowego Adresata z dnia 21 lipca 2026 r.",
+        "event": [
+          [
+            "zapytani"
+          ]
+        ]
       },
       {
         "date": "2026-08-12",
-        "label": "rejected variant quote"
+        "label": "rejected variant B quote",
+        "page": 2,
+        "evidence": "Wariant B z bezprzewodowymi czujnikami (wycena z dnia 12 sierpnia 2026 r.)",
+        "event": [
+          [
+            "wariant",
+            "wycen"
+          ]
+        ]
       },
       {
         "date": "2026-11-02",
-        "label": "work start"
+        "label": "work start",
+        "page": 3,
+        "evidence": "Rozpoczęcie prac: 2 listopada 2026 r.",
+        "event": [
+          [
+            "rozpocz",
+            "start"
+          ],
+          [
+            "prac",
+            "robót"
+          ]
+        ]
       },
       {
         "date": "2027-02-26",
-        "label": "final acceptance"
+        "label": "final acceptance",
+        "page": 3,
+        "evidence": "Odbiór końcowy: do dnia 26 lutego 2027 r.",
+        "event": [
+          [
+            "odbi"
+          ]
+        ]
       }
     ],
     "forbiddenAmounts": [
