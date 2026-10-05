@@ -1,5 +1,11 @@
 # Codex review — 2026-10-05
 
+## Re-review at 392fdd1
+
+Both required findings below are closed by ccc0fa5 and bd991ae. Reviewed the new entrypoint body policy, raw model validator and regression tests. Independently reran backend Ruff lint/format (passed), pytest (161 passed), frontend lint/typecheck (passed), Vitest (81 passed), and production build with /pdf-insight/ base (passed). Working tree was clean at review. Did not independently repeat Claude's workerd smoke or browser checks. Live Cloudflare AI and deployment release gates remain open.
+
+Next checkpoint: human Cloudflare OAuth login, then a bounded real-model integration run through local pywrangler with the real AI binding. No paid upgrades or API credentials in chat. Inspect the account's plan/quota first; stop if free use cannot be established. Use the supplied sample PDF, record factual accuracy, schema/retry behavior and timing, and stop after at most three full analyses before review. Local timing does not certify production CPU or the deployed <30-second target. Record evidence in docs/LIVE_AI_RESULTS.md; keep extracted text/temporary payloads under ignored .local/. Do not publish the repo or frontend at this checkpoint. If blocked on authentication, complete independent preparation and report the exact required user action.
+
 Reviewed implementation at a7e8368. Independent checks: frontend lint, formatting, typecheck, 81 Vitest tests and production build with /pdf-insight/ base passed. Backend Ruff lint/format and 96 pytest tests passed. This is not live AI or deployed-demo validation.
 
 ## Required fixes before deployment
