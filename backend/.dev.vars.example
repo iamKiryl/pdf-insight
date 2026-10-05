@@ -1,0 +1,3 @@
+# Copy to .dev.vars for `uv run pywrangler dev`. No secrets are needed: Workers AI uses the AI binding.
+ENVIRONMENT=development
+ALLOWED_ORIGINS=http://localhost:5173

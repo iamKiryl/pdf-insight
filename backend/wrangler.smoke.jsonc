@@ -1,0 +1,19 @@
+{
+  // Local runtime smoke test WITHOUT Cloudflare credentials: same Worker, no AI binding (the AI
+  // binding always needs a remote session). Rate limiting bindings are simulated locally.
+  // Usage: uv run pywrangler dev --config wrangler.smoke.jsonc
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pdf-insight-api-smoke",
+  "main": "src/worker.py",
+  "compatibility_date": "2026-10-05",
+  "compatibility_flags": ["python_workers"],
+  "ratelimits": [
+    { "name": "ANALYZE_IP_LIMITER", "namespace_id": "41001", "simple": { "limit": 5, "period": 60 } },
+    { "name": "ANALYZE_GLOBAL_LIMITER", "namespace_id": "41002", "simple": { "limit": 30, "period": 60 } }
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "ALLOWED_ORIGINS": "http://localhost:5173",
+    "MAX_BODY_BYTES": "262144"
+  }
+}

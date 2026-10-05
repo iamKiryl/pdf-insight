@@ -14,3 +14,5 @@ __pycache__/
 .local/
 .DS_Store
 coverage/
+python_modules/
+pylock.toml

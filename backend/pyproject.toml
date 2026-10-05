@@ -1,0 +1,33 @@
+[project]
+name = "pdf-insight-api"
+version = "0.1.0"
+description = "PDF Insight analysis API (FastAPI on Cloudflare Python Workers + Workers AI)"
+requires-python = ">=3.13"
+dependencies = ["fastapi", "pydantic"]
+
+[dependency-groups]
+dev = [
+    "workers-py",
+    "workers-runtime-sdk",
+    "pytest",
+    "httpx",
+    "ruff",
+    "httpx2>=2.13.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+extend-exclude = ["python_modules", "node_modules"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "T20", "RUF"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "RUF001"]
