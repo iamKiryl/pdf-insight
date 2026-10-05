@@ -186,3 +186,7 @@ chunking, новых живых запросов и публикации.»
   placeholder commit hash briefly appeared in the results doc before being corrected.
 - Re-scored all seven saved responses offline: every one is `failed`; no manual review was done,
   so no summary or context meaning is counted as passed. No model calls, chunking or publication.
+
+## 2026-10-05 — Codex evaluator re-review
+
+Reviewed 7fbae0e and independently repeated numeric, wrong-event and fabricated-summary probes. Observed corrected rejection/pending statuses. Ruff lint/format passed. Initial pytest: 232 passed, 5 errors from sandbox-denied localhost socket binding. After network permission for local test servers, full pytest: 237 passed. No provider calls. Next implementation task recorded in docs/NEXT_CHUNKING.md; mock results will not justify changing production default.
