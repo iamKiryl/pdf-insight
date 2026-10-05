@@ -13,6 +13,8 @@ from .contract import DOCUMENT_TYPES, AnalyzeRequest
 
 _TAG = re.compile(r"<\s*/?\s*(document|page)\b[^>]*>?", re.IGNORECASE)
 
+PROMPT_VERSION = "v2-2026-10-05"
+
 SYSTEM_PROMPT = """You are a document analysis engine. You extract facts from ONE document and \
 return JSON that matches the provided schema. Follow only these rules:
 
@@ -28,19 +30,31 @@ is written in). Short passages in another language do not change it.
 4. type: one of faktura (invoice), umowa (contract/agreement), oferta (offer), raport (report), \
 inne (other). Classify the main document; attachments such as an invoice annexed to a contract do \
 not change the type.
-5. title: the title stated in the document, copied as written; null if there is no title. Do not \
-make one up.
-6. date: the main date of the document (e.g. signing/issue date) as YYYY-MM-DD, or null.
-7. summary: 3 to 5 complete, factual sentences in the document language. End every sentence with \
-a period. Avoid ending a sentence with an abbreviation (write "roku" instead of "r.").
-8. keyPoints: 3 to 7 short, distinct points supported by the document, in the document language.
-9. organizations and people: names exactly as written; [] when none.
-10. amounts: every distinct monetary amount with value as a plain number (e.g. 184500.00), \
-currency as an ISO 4217 code (PLN, EUR, USD, ...) and a short context in the document language \
-that keeps its meaning: net/gross, per month/per year, budget, rejected or historical offer, \
-share capital, advance, penalty. Keep amounts in different currencies separate.
-11. dates: distinct dated events as YYYY-MM-DD with a short context in the document language.
-12. keywords: up to 10 short keywords in the document language.
+5. title: the full title stated in the document, copied as written (including its subtitle or \
+subject line); null if there is no title. Do not make one up.
+6. date: the main date of the document (signing or issue date) as YYYY-MM-DD, or null.
+7. summary: 3 to 5 complete, factual sentences in the document language (3 is enough). End every \
+sentence with a period. Avoid ending a sentence with an abbreviation (write "roku" instead of "r.").
+8. keyPoints: 3 to 7 concise, complete sentences in the document language, each a distinct fact \
+supported by the document.
+9. organizations: full names exactly as written INCLUDING the legal form (for example \
+"sp. z o.o.", "sp.k.", "S.A.", "GmbH", "Ltd", "Inc."). people: natural persons named in the \
+document (the grammatical base form of the name is allowed). [] when none.
+10. amounts: list EVERY distinct monetary amount stated anywhere in the document text, including \
+tables, attachments, annexes and invoices: prices, fees, subscriptions, budgets, VAT amounts, net \
+and gross values, advances, penalties and caps, share capital, and historical, alternative or \
+rejected offers. If the same value appears with different meanings, list each meaning. value: the \
+number as stated (e.g. 184500.00), never converted, rounded, added up or otherwise calculated. \
+currency: ISO 4217 code (PLN for "zł"). context: a short description in the document language \
+that COPIES every qualifier stated with the amount: net/gross (e.g. "netto"/"brutto") or VAT, \
+the period (e.g. monthly, yearly, one-off, per instance), the status (e.g. budget, maximum, \
+rejected, historical, estimated) and what it is for.
+11. dates: list EVERY distinct dated event in the document text as YYYY-MM-DD, including the \
+signing or issue date of the main document (also when it is the main date), start and end of \
+validity, deadlines, invoice issue and payment due dates, annex or amendment dates, delivery, \
+acceptance or go-live dates. context: which event it is, in the document language. Use only dates \
+whose day, month and year are stated.
+12. keywords: up to 8 short topic keywords in the document language.
 13. If some pages had no extractable text, do not claim that the whole document was analysed and \
 do not guess what those pages contain.
 14. If the document does not contain enough information for a factual 3-sentence summary and 3 \
@@ -69,6 +83,7 @@ MODEL_OUTPUT_SCHEMA: dict[str, Any] = {
                 "type": "object",
                 "properties": {"value": {"type": "number"}, "currency": _STR, "context": _STR},
                 "required": ["value", "currency", "context"],
+                "additionalProperties": False,
             },
         },
         "dates": {
@@ -77,6 +92,7 @@ MODEL_OUTPUT_SCHEMA: dict[str, Any] = {
                 "type": "object",
                 "properties": {"date": _STR, "context": _STR},
                 "required": ["date", "context"],
+                "additionalProperties": False,
             },
         },
         "keywords": _STR_LIST,
@@ -85,6 +101,7 @@ MODEL_OUTPUT_SCHEMA: dict[str, Any] = {
         "insufficientContent", "language", "type", "title", "date", "summary", "keyPoints",
         "organizations", "people", "amounts", "dates", "keywords",
     ],
+    "additionalProperties": False,
 }  # fmt: skip
 
 

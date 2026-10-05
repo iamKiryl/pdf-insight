@@ -13,6 +13,7 @@ from .contract import MAX_TOTAL_CHARS, MIN_TOTAL_LETTERS, AnalyzeRequest
 from .errors import ApiError
 from .logs import log_event
 from .middleware import BodyLimitMiddleware, CorsMiddleware
+from .prompt import PROMPT_VERSION
 from .runtime import Runtime, RuntimeFactory
 
 
@@ -81,7 +82,11 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
     async def analyze_document(request: Request) -> JSONResponse:
         started = time.monotonic()
         runtime = runtime_factory(request.scope)
-        fields: dict[str, Any] = {"event": "analyze", "model": runtime.settings.ai_model}
+        fields: dict[str, Any] = {
+            "event": "analyze",
+            "model": runtime.settings.ai_model,
+            "promptVersion": PROMPT_VERSION,
+        }
         usage = ModelUsage()
         try:
             await _enforce_rate_limit(runtime, request.headers.get("cf-connecting-ip", "unknown"))

@@ -11,7 +11,7 @@ from conftest import (
     make_request,
     valid_model_output,
 )
-from pdf_insight.prompt import SYSTEM_PROMPT
+from pdf_insight.prompt import PROMPT_VERSION, SYSTEM_PROMPT
 from pdf_insight.runtime import AIProviderError
 
 JSON_HEADERS = {"Origin": ORIGIN}
@@ -427,6 +427,7 @@ def test_logs_usage_on_failure_and_ignores_malformed_usage(capsys):
     assert line == {
         "event": "analyze",
         "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+        "promptVersion": PROMPT_VERSION,
         "pageCount": 2,
         "pagesWithoutText": 0,
         "textChars": line["textChars"],

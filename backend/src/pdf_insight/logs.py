@@ -6,8 +6,8 @@ import sys
 ALLOWED_FIELDS = frozenset(
     {
         "event", "outcome", "status", "ms", "attempts", "pageCount", "pagesWithoutText",
-        "textChars", "model", "modelCallsStarted", "modelCallsCompleted", "usageReportedCalls",
-        "usageComplete", "reportedPromptTokens", "reportedCompletionTokens",
+        "textChars", "model", "promptVersion", "modelCallsStarted", "modelCallsCompleted",
+        "usageReportedCalls", "usageComplete", "reportedPromptTokens", "reportedCompletionTokens",
     }
 )  # fmt: skip
 
