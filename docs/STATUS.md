@@ -55,7 +55,7 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 
 ```
 backend$  uv run ruff check .            # All checks passed
-backend$  uv run ruff format --check .   # 26 files already formatted
+backend$  uv run ruff format --check .   # 27 files already formatted
 backend$  uv run pytest -q               # 194 passed (161 after the review fixes, 96 in Stage 1)
 backend$  uv lock --check                # lock up to date
 frontend$ npm run lint                   # 0 problems (--max-warnings=0)
