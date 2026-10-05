@@ -52,7 +52,7 @@ EXCLUSIVE_GROUPS: tuple[frozenset[str], ...] = (
     frozenset({"net", "gross"}),
     frozenset({"monthly", "yearly", "one-off", "daily"}),
 )
-NEGATIONS = (r"nie dotyczy", r"\bn/?a\b", r"not applicable", r"brak danych")
+NEGATIONS = (r"nie dotyczy", r"\bn/a\b", r"not applicable", r"brak danych")  # not bare "na" (pl)
 LEGAL_FORMS = (
     r"sp\. ?z ?o\.? ?o\.?", r"sp\. ?k\.", r"s\.a\.", r"s\.k\.a\.", r"gmbh", r"\bltd\b", r"\binc\b",
 )  # fmt: skip

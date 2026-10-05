@@ -9,6 +9,7 @@ import pytest
 from evaluation.checks import (
     MANUAL_DIMENSIONS,
     assess,
+    conflicts,
     evaluate,
     has_qualifier,
     result_digest,
@@ -233,6 +234,18 @@ def test_amount_parsing_counterexamples(value, text, currency, found):
 )
 def test_date_parsing(iso, text, found):
     assert date_in_source(iso, text) is found
+
+
+@pytest.mark.parametrize(
+    ("context", "negated"),
+    [
+        ("zaliczka na wdrożenie", False),  # Polish preposition "na" is not "n/a"
+        ("Nie dotyczy", True),
+        ("kwota: n/a", True),
+    ],
+)
+def test_negation_markers(context, negated):
+    assert ("negation" in conflicts(context, set())) is negated
 
 
 @pytest.mark.parametrize(
