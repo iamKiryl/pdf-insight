@@ -17,7 +17,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 
 [tool.ruff]
 line-length = 100
@@ -29,5 +29,9 @@ extend-exclude = ["python_modules", "node_modules"]
 select = ["E", "F", "W", "I", "B", "UP", "S", "T20", "RUF"]
 ignore = ["S101"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["pdf_insight", "evaluation"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "RUF001"]
+"evaluation/run_live.py" = ["T201", "S310"]  # local CLI: prints a report, opens a localhost URL
