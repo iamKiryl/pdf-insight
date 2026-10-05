@@ -43,7 +43,7 @@ def make_request(texts: list[str]) -> dict:
 
 
 def amount(value, evidence, page, context="Kwota", currency="PLN", basis="net",
-           period="one-off", status="current"):  # fmt: skip
+           period="unspecified", status="current"):  # fmt: skip
     return {"value": value, "currency": currency, "basis": basis, "period": period,
             "status": status, "context": context, "page": page, "evidence": evidence}  # fmt: skip
 
@@ -114,7 +114,7 @@ def test_facts_only_on_the_final_chunk_are_merged(capsys):
     response = post(ai, make_request(texts))
     assert response.status_code == 200
     assert response.json()["amounts"] == [
-        {"value": 4321.0, "currency": "PLN", "context": "Opłata końcowa (netto, jednorazowo)"}
+        {"value": 4321.0, "currency": "PLN", "context": "Opłata końcowa (netto)"}
     ]
     log = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert (log["mode"], log["chunks"], log["modelCallsStarted"]) == ("chunked", 3, 4)

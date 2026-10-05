@@ -1,6 +1,11 @@
 """Validation, evidence grounding and deterministic merging of chunk outputs (pure functions).
 
 Merge rules (docs/CHUNKING.md):
+- An amount's currency and every stated qualifier (basis, period, status other than
+  "unspecified"/"other"/"current") must be supported at the cited occurrence: the number token
+  inside the cited text carries that currency (adjacent marker or the page's "Waluta:" line) and
+  the qualifier is named in the same sentence or table row (bounded to 200 chars each side).
+  A short quote never licenses a currency or qualifier the source does not state there.
 - Every fact must cite evidence that occurs in one of the chunk's pages (after whitespace, quote
   and dash normalisation) and contains the value/date; the page is taken from where the evidence is
   found, not from the model. Any unsupported fact makes the whole chunk output invalid (it goes
@@ -209,6 +214,26 @@ def _locate(evidence: str, preferred: int, chunk: Chunk):
     return None
 
 
+_SENTENCE_END = re.compile(r"[.!?;](?=\s)|\n")
+WINDOW_CHARS = 200
+
+
+def sentence_window(text: str, start: int, end: int) -> str:
+    """The sentence or table row around [start, end), bounded to WINDOW_CHARS on each side."""
+    low = max(0, start - WINDOW_CHARS)
+    left = low
+    for match in _SENTENCE_END.finditer(text, low, start):
+        left = match.end()
+    right_match = _SENTENCE_END.search(text, end, min(len(text), end + WINDOW_CHARS))
+    right = right_match.start() + 1 if right_match else min(len(text), end + WINDOW_CHARS)
+    return text[left:right]
+
+
+def _states(text: str, token, qualifiers: list[str]) -> bool:
+    window = sentence_window(text, token.start, token.end).casefold()
+    return all(re.search(_MENTIONED[q], window) for q in qualifiers)
+
+
 def ground_chunk(request: AnalyzeRequest, chunk: Chunk, output: ChunkOutput) -> GroundedChunk:
     """Attach every fact to the source occurrence it cites, or raise InvalidModelOutput listing the
     unsupported facts (field paths and reasons only, never the quoted text)."""
@@ -218,21 +243,30 @@ def ground_chunk(request: AnalyzeRequest, chunk: Chunk, output: ChunkOutput) -> 
         people=_clean_list(output.people),
         keywords=_clean_list(output.keywords),
     )
+    texts = {p.page: p.text for p in request.pages}
     for i, amount in enumerate(output.amounts):
         where = _locate(amount.evidence, amount.page, chunk)
-        tokens = amounts_on_page(0, amount.evidence) if where else []
-        matching = [t for t in tokens if as_decimal(t.value) == as_decimal(amount.value)]
         currency = amount.currency.upper()
         if not where:
             problems.append(f"amounts.{i}.evidence: not found verbatim in the text of this part")
             continue
-        if not matching:
+        page, start, end = where
+        tokens = [
+            t for t in amounts_on_page(page, texts[page])
+            if start <= t.start and t.end <= end and as_decimal(t.value) == as_decimal(amount.value)
+        ]  # fmt: skip
+        if not tokens:
             problems.append(f"amounts.{i}.value: not present in the quoted evidence")
             continue
-        if any(t.currency not in (None, currency) for t in matching):
-            problems.append(f"amounts.{i}.currency: contradicts the quoted evidence")
+        claimed = [q for q in (amount.basis, amount.period, amount.status) if q in _MENTIONED]
+        with_currency = [t for t in tokens if t.currency == currency]
+        if not with_currency:
+            problems.append(f"amounts.{i}.currency: not stated for this value where it is quoted")
             continue
-        page, start, end = where
+        if not any(_states(texts[page], t, claimed) for t in with_currency):
+            names = ", ".join(claimed)
+            problems.append(f"amounts.{i}: {names} not stated in the sentence or row of the value")
+            continue
         grounded.amounts.append(GroundedAmount(
             amount.value, currency, amount.basis, amount.period, amount.status,
             amount.context.strip(), page, start, end, chunk.index,

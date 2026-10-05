@@ -40,7 +40,7 @@ REQUEST = request_for([PAGE1, PAGE2])
 CHUNK = build_chunks(REQUEST)[0]
 
 
-def amount(value, currency, context, evidence, page=1, basis="net", period="one-off",
+def amount(value, currency, context, evidence, page=1, basis="net", period="unspecified",
            status="current"):  # fmt: skip
     return {"value": value, "currency": currency, "basis": basis, "period": period,
             "status": status, "context": context, "page": page, "evidence": evidence}  # fmt: skip

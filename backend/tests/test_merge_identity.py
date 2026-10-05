@@ -48,7 +48,7 @@ def test_equal_snippets_at_different_offsets_of_a_split_page_stay_separate():
     request = request_for([page])
     first, second = build_chunks(request)
     assert snippet in first.segments[0].new_text and snippet in second.segments[0].new_text
-    fact = output(amounts=[amount("Opłata", snippet, value=200)])
+    fact = output(amounts=[{**amount("Opłata", snippet, value=200), "period": "unspecified"}])
     result, stats = merge(request, OVERVIEW, [ground_chunk(request, first, fact),
                                               ground_chunk(request, second, fact)])  # fmt: skip
     assert len(result.amounts) == 2  # two occurrences in the source, not one

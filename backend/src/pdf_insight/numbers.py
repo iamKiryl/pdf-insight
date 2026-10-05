@@ -71,6 +71,8 @@ class AmountToken:
     value: Decimal
     currency: str | None
     text: str
+    start: int = 0  # offsets of the number in the parsed text
+    end: int = 0
 
 
 def parse_number(raw: str) -> Decimal:
@@ -109,6 +111,8 @@ def amounts_on_page(page: int, text: str) -> list[AmountToken]:
                 parse_number(match.group("num")),
                 currency or page_currency,
                 match.group("num"),
+                match.start("num"),
+                match.end("num"),
             )
         )
     return tokens
