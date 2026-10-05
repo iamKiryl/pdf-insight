@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .config import Settings
 from .contract import AnalysisInfo, AnalysisResult, AnalyzeRequest
@@ -46,36 +46,50 @@ def fallback_title(language: str) -> str:
     return FALLBACK_TITLES.get(language, DEFAULT_FALLBACK_TITLE)
 
 
-def _clean_str(value: Any) -> Any:
-    return value.strip() if isinstance(value, str) else value
+class _Raw(BaseModel):
+    # strict: no str→number or bool→number coercion; extra keys (e.g. a model-invented fileName)
+    # are ignored because the server owns metadata.
+    model_config = ConfigDict(strict=True, extra="ignore")
 
 
-def _clean_list(values: Any) -> Any:
-    """Trim strings and drop blanks and case-insensitive duplicates; validation handles the rest."""
-    if not isinstance(values, list):
-        return values
+class RawAmount(_Raw):
+    value: float = Field(allow_inf_nan=False)
+    currency: str
+    context: str
+
+
+class RawDate(_Raw):
+    date: str
+    context: str
+
+
+class ModelOutput(_Raw):
+    """Raw shape requested from the model (prompt.MODEL_OUTPUT_SCHEMA), validated BEFORE any
+    normalisation. Every key is required: a missing key is invalid output (one correction retry),
+    never an implicit empty value. Only title and date may be explicitly null; lists may be []."""
+
+    insufficientContent: bool
+    language: str
+    type: str
+    title: str | None
+    date: str | None
+    summary: str
+    keyPoints: list[str]
+    organizations: list[str]
+    people: list[str]
+    amounts: list[RawAmount]
+    dates: list[RawDate]
+    keywords: list[str]
+
+
+def _clean_list(values: list[str]) -> list[str]:
+    """Trim strings and drop blanks and case-insensitive duplicates."""
     seen: set[str] = set()
-    cleaned: list[Any] = []
-    for item in values:
-        item = _clean_str(item)
-        if isinstance(item, str):
-            if not item or item.casefold() in seen:
-                continue
+    cleaned: list[str] = []
+    for item in (value.strip() for value in values):
+        if item and item.casefold() not in seen:
             seen.add(item.casefold())
-        cleaned.append(item)
-    return cleaned
-
-
-def _clean_objects(values: Any, fields: tuple[str, ...]) -> Any:
-    if not isinstance(values, list):
-        return values
-    cleaned = []
-    for item in values:
-        if isinstance(item, dict):
-            item = {k: _clean_str(v) for k, v in item.items() if k in fields}
-            if "currency" in item and isinstance(item["currency"], str):
-                item["currency"] = item["currency"].upper()
-        cleaned.append(item)
+            cleaned.append(item)
     return cleaned
 
 
@@ -93,36 +107,44 @@ def _parse_payload(raw: Any) -> dict[str, Any]:
 
 
 def build_result(payload: dict[str, Any], request: AnalyzeRequest) -> AnalysisResult:
-    """Normalise model output into the public contract; server owns fileName/pages/analysis."""
+    """Validate the raw model payload, then normalise it into the public contract.
+
+    The server owns fileName/pages/analysis. An explicit ``insufficientContent: true`` is honoured
+    even if the model left other fields out, because no result will be built from them.
+    """
     if payload.get("insufficientContent") is True:
         raise ApiError("INSUFFICIENT_CONTENT")
+    try:
+        raw = ModelOutput.model_validate(payload)
+    except ValidationError as exc:
+        raise InvalidModelOutput(_describe(exc)) from None
 
-    language = _clean_str(payload.get("language"))
-    language = language.lower() if isinstance(language, str) else language
-    title = _clean_str(payload.get("title"))
-    title_fallback = title is None or title == ""
-    if title_fallback:
-        title = fallback_title(language if isinstance(language, str) else "")
-    date = _clean_str(payload.get("date"))
+    language = raw.language.strip().lower()
+    title = (raw.title or "").strip()
+    title_fallback = not title
+    date = (raw.date or "").strip() or None
 
     candidate = {
         "document": {
             "fileName": request.fileName.strip(),
             "pages": request.pageCount,
             "language": language,
-            "type": _clean_str(payload.get("type")),
-            "title": title,
-            "date": None if date == "" else date,
+            "type": raw.type.strip(),
+            "title": fallback_title(language) if title_fallback else title,
+            "date": date,
         },
-        "summary": _clean_str(payload.get("summary")),
-        "keyPoints": _clean_list(payload.get("keyPoints")),
+        "summary": raw.summary.strip(),
+        "keyPoints": _clean_list(raw.keyPoints),
         "entities": {
-            "organizations": _clean_list(payload.get("organizations", [])),
-            "people": _clean_list(payload.get("people", [])),
+            "organizations": _clean_list(raw.organizations),
+            "people": _clean_list(raw.people),
         },
-        "amounts": _clean_objects(payload.get("amounts", []), ("value", "currency", "context")),
-        "dates": _clean_objects(payload.get("dates", []), ("date", "context")),
-        "keywords": _clean_list(payload.get("keywords", [])),
+        "amounts": [
+            {"value": a.value, "currency": a.currency.strip().upper(), "context": a.context.strip()}
+            for a in raw.amounts
+        ],
+        "dates": [{"date": d.date.strip(), "context": d.context.strip()} for d in raw.dates],
+        "keywords": _clean_list(raw.keywords),
         "analysis": AnalysisInfo(
             complete=not request.pagesWithoutText,
             pagesWithoutText=list(request.pagesWithoutText),
