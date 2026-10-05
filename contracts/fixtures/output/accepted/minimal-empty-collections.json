@@ -1,0 +1,31 @@
+{
+  "description": "English document with null date, empty collections and deterministic fallback title",
+  "data": {
+    "document": {
+      "fileName": "memo.pdf",
+      "pages": 1,
+      "language": "en",
+      "type": "inne",
+      "title": "Untitled document",
+      "date": null
+    },
+    "summary": "The memo announces that the office will be closed for maintenance. Staff are asked to work remotely during the closure. Questions should be sent to the facilities team.",
+    "keyPoints": [
+      "The office closes for maintenance.",
+      "Staff work remotely during the closure.",
+      "Questions go to the facilities team."
+    ],
+    "entities": {
+      "organizations": [],
+      "people": []
+    },
+    "amounts": [],
+    "dates": [],
+    "keywords": [],
+    "analysis": {
+      "complete": true,
+      "pagesWithoutText": [],
+      "titleFallback": true
+    }
+  }
+}

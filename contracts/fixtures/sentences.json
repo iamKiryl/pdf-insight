@@ -1,0 +1,18 @@
+{
+  "description": "Shared cases for the conservative sentence-count interval. min treats ambiguous boundaries (after abbreviations, initials, or before a digit) as non-boundaries; max treats them as boundaries. valid = text ends with terminal punctuation.",
+  "cases": [
+    { "text": "Jedno zdanie.", "min": 1, "max": 1, "valid": true },
+    { "text": "Pierwsze zdanie. Drugie zdanie! Trzecie zdanie?", "min": 3, "max": 3, "valid": true },
+    { "text": "Umowę zawarła Nordwave Logistics sp. z o.o. z firmą Kwadrat Software S.A. w Warszawie.", "min": 1, "max": 1, "valid": true },
+    { "text": "Strony to Nordwave Logistics sp. z o.o. oraz Kwadrat Software S.A. Umowa obowiązuje od marca.", "min": 1, "max": 2, "valid": true },
+    { "text": "Kwota wynosi 184 500,00 PLN. Udział wynosi 1.5 procent. Koniec.", "min": 3, "max": 3, "valid": true },
+    { "text": "Dokument podpisał J. Kowalski. Umowa m.in. obejmuje wdrożenie. Termin to ok. 30 dni.", "min": 3, "max": 5, "valid": true },
+    { "text": "Zapłata nastąpi w terminie. 12 rat jest przewidzianych.", "min": 1, "max": 2, "valid": true },
+    { "text": "Cytat: „To jest koniec.” Kolejne zdanie.", "min": 2, "max": 2, "valid": true },
+    { "text": "Wait... Really? Yes!", "min": 3, "max": 3, "valid": true },
+    { "text": "Brak kropki na końcu", "min": 1, "max": 1, "valid": false },
+    { "text": "   ", "min": 0, "max": 0, "valid": false },
+    { "text": "Zawarto umowę dnia 12.03.2026 r. Strony ustaliły warunki.", "min": 1, "max": 2, "valid": true },
+    { "text": "Éclair est prêt. Ça marche. Über alles.", "min": 3, "max": 3, "valid": true }
+  ]
+}

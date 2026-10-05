@@ -1,0 +1,77 @@
+{
+  "description": "Summary has 6 sentences",
+  "data": {
+    "document": {
+      "fileName": "Test_PDF_Insight_umowa_14-2026.pdf",
+      "pages": 12,
+      "language": "pl",
+      "type": "umowa",
+      "title": "Umowa ramowa nr 14/2026 o wdrożenie i utrzymanie systemu",
+      "date": "2026-03-12"
+    },
+    "summary": "Zdanie pierwsze. Zdanie drugie. Zdanie trzecie. Zdanie czwarte. Zdanie piąte. Zdanie szóste.",
+    "keyPoints": [
+      "Wdrożenie systemu za 184 500 PLN netto (226 935 PLN brutto).",
+      "Abonament serwisowy 12 300 PLN netto miesięcznie.",
+      "Licencje 8 600 EUR rocznie oraz hosting 890 USD miesięcznie.",
+      "Uruchomienie produkcyjne zaplanowano na 12 października 2026 roku."
+    ],
+    "entities": {
+      "organizations": [
+        "Nordwave Logistics sp. z o.o.",
+        "Kwadrat Software S.A."
+      ],
+      "people": []
+    },
+    "amounts": [
+      {
+        "value": 184500,
+        "currency": "PLN",
+        "context": "Wynagrodzenie za wdrożenie netto"
+      },
+      {
+        "value": 226935,
+        "currency": "PLN",
+        "context": "Wynagrodzenie za wdrożenie brutto"
+      },
+      {
+        "value": 12300,
+        "currency": "PLN",
+        "context": "Abonament serwisowy netto miesięcznie"
+      },
+      {
+        "value": 8600,
+        "currency": "EUR",
+        "context": "Licencje rocznie"
+      },
+      {
+        "value": 890,
+        "currency": "USD",
+        "context": "Hosting miesięcznie"
+      }
+    ],
+    "dates": [
+      {
+        "date": "2026-03-12",
+        "context": "Data zawarcia umowy"
+      },
+      {
+        "date": "2026-10-12",
+        "context": "Planowane uruchomienie produkcyjne (Go-live)"
+      }
+    ],
+    "keywords": [
+      "umowa ramowa",
+      "wdrożenie",
+      "utrzymanie",
+      "abonament"
+    ],
+    "analysis": {
+      "complete": false,
+      "pagesWithoutText": [
+        11
+      ],
+      "titleFallback": false
+    }
+  }
+}
