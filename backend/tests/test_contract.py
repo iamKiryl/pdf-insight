@@ -48,3 +48,18 @@ def test_code_lists_mirror_contract():
     codes = json.loads((CONTRACTS / "codes.json").read_text(encoding="utf-8"))
     assert set(codes["languages"]) == LANGUAGES
     assert set(codes["currencies"]) == CURRENCIES
+
+
+def test_limits_mirror_contract():
+    from pdf_insight import contract
+    from pdf_insight.config import load_settings
+
+    limits = json.loads((CONTRACTS / "limits.json").read_text(encoding="utf-8"))
+    assert limits["maxBodyBytes"] == load_settings(lambda _: None).max_body_bytes
+    assert limits["maxPages"] == contract.MAX_PAGES
+    assert limits["maxPageChars"] == contract.MAX_PAGE_CHARS
+    assert limits["maxTotalChars"] == contract.MAX_TOTAL_CHARS
+    assert limits["minTotalLetters"] == contract.MIN_TOTAL_LETTERS
+    assert tuple(limits["summarySentences"]) == contract.SUMMARY_SENTENCES
+    assert tuple(limits["keyPoints"]) == contract.KEY_POINTS
+    assert limits["maxKeywords"] == contract.MAX_KEYWORDS

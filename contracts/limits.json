@@ -1,0 +1,12 @@
+{
+  "description": "Request and response limits enforced by both the backend (contract.py, config.py) and the frontend (src/lib/limits.ts). Tests on both sides assert they match this file.",
+  "maxFileBytes": 10485760,
+  "maxBodyBytes": 262144,
+  "maxPages": 500,
+  "maxPageChars": 20000,
+  "maxTotalChars": 48000,
+  "minTotalLetters": 200,
+  "summarySentences": [3, 5],
+  "keyPoints": [3, 7],
+  "maxKeywords": 20
+}

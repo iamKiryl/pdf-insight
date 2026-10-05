@@ -3,7 +3,8 @@
 Single source of truth for the request, response and error shapes shared by the
 Python backend (Pydantic) and the TypeScript frontend (Zod). Both validators run
 the same fixture files in `fixtures/`, so a schema change must update both sides
-and the fixtures in one commit.
+and the fixtures in one commit. Numeric limits live in `limits.json` and code lists in
+`codes.json`; tests on both sides assert their constants match these files.
 
 ## `POST /api/analyze`
 
