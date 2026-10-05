@@ -68,3 +68,36 @@ additional usage purchased, no other models delegated to.
 - No live Workers AI call, no deployment, no GitHub repository or Pages URL, no latency, CPU or
   quota measurements. Mocks and a local stub were used for model responses; they are not live AI
   verification.
+
+## 2026-10-05 — Fixes for Codex review of Stage 1 (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Codex проверил Stage 1. Прочитай docs/REVIEW_STAGE1.md и
+выполни раздел Next Claude prompt: исправь два дефекта отдельными коммитами, добавь регрессионные
+тесты, обнови STATUS и AI_LOG. Пока без деплоя и расширения функциональности.»
+
+Both review findings were real defects in code written by Claude in Stage 1:
+
+1. **Unbounded bodies (P1).** My entrypoint bounded only an exact `POST /api/analyze` and passed
+   every other request straight to the Workers ASGI adapter, which queues the full body. I had
+   verified the adapter behaviour myself and still only protected one route. Fix (`ccc0fa5`): the
+   entrypoint now rebuilds every request; only `POST /api/analyze` (path percent-decoded like the
+   adapter) reads up to limit+1 bytes, slicing chunks before retaining them; everything else is
+   forwarded without a body; FastAPI `redirect_slashes=False`. New tests load `src/worker.py`
+   with fake `js`/`workers`/`pyodide` modules and count stream reads; 10 of them fail on the old
+   entrypoint. Local workerd: 20 MB chunked uploads to `/api/analyze/`, `/unknown`, PUT/PATCH →
+   404/405 in ~4 ms with 0 bytes uploaded; `/api/analyze` → 413.
+2. **Incomplete model output accepted (P1).** My `build_result` used `payload.get(key, [])`, so
+   a model answer with missing keys became a 200 with empty collections and no retry. Reproduced
+   the reviewer's case (200, one call) with a failing test first. Fix (`bd991ae`): strict raw
+   `ModelOutput` (all 12 keys, strict types, only title/date nullable, extra keys ignored) is
+   validated before normalisation; explicit `insufficientContent: true` still short-circuits.
+   Tests: each missing key → exactly two calls then 200, twice → `AI_INVALID_OUTPUT`; 16 wrong
+   shapes; explicit null/[] valid on the first call; requested JSON schema parity.
+
+Mistakes during the fix: one new test passed `str` header keys where the callback receives
+`bytes` (test corrected); a curl smoke loop used an unquoted zsh variable that was not
+word-split, producing invalid-header 400s from the dev proxy (rerun with explicit arguments).
+
+Checks after the fixes: backend ruff/format clean, pytest 161 passed; frontend lint, format,
+typecheck clean, Vitest 81 passed, `/pdf-insight/` build with worker path check passed. No
+deployment, no live AI, no paid APIs.

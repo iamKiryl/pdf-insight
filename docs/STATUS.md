@@ -41,22 +41,22 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 | Item | State | Evidence |
 |---|---|---|
 | No model key; AI via binding only | Done | `wrangler.jsonc` `ai` binding; no key variables exist |
-| Bounded body before parse | Done, tested | pytest (declared length, streamed overflow stops after limit, `read_limited` stops consuming); workerd smoke: chunked 400 KB → 413 |
+| Bounded body before parse | Done, tested (fixed after review, `ccc0fa5`) | Every request is rebuilt in the entrypoint before the ASGI adapter: only `POST /api/analyze` (path decoded like the adapter) streams ≤ `MAX_BODY_BYTES + 1` bytes; other paths, `/api/analyze/`, other methods and preflight are forwarded without a body. pytest drives `src/worker.py` with fake js/workers modules (body stream never read for 9 route/method cases; 65 MB chunked and 8 MB single-chunk analyze bodies cut at limit+1); ASGI-level no-read test; workerd checks below |
 | Origin allowlist from config | Done, tested | pytest + workerd smoke (403 foreign, 204 preflight, ACAO on allowed) |
 | Shared rate limiting | Done, locally tested | Rate Limiting bindings; workerd smoke: 5×503 then 429 for one IP (local simulation). **Not verified on Cloudflare.** Production fails closed without bindings (pytest) |
 | No document text in logs | Done, tested | whitelist logger; pytest asserts marker text absent |
 | Prompt injection | Mitigated, tested structurally | pytest: injected text stays inside the single data block, fake tags neutralised, system prompt unchanged. **Whether Llama obeys is unverified** |
 | Metadata ownership | Done, tested | pytest: model-supplied fileName/pages ignored |
-| Malformed response | Done, tested | pytest (non-JSON, wrong shapes), Vitest (200 with invalid body → error, not displayed) |
+| Malformed / incomplete model response | Done, tested (fixed after review, `bd991ae`) | Raw `ModelOutput` validated strictly before normalisation: all 12 keys required, only title/date nullable. pytest: reviewer reproduction → 502 after exactly 2 calls; each missing key → retry → 200 (2 calls) and twice → `AI_INVALID_OUTPUT` (2 calls); 16 wrong-shape cases retried; explicit null/[] valid on first call. Vitest: 200 with invalid body → error, not displayed |
 | Provider failure / timeout / quota | Done, tested (mocks) | pytest 502/503/504 mapping, error text classification |
 | No `any`, `console.log`, `dangerouslySetInnerHTML` | Enforced | ESLint rules (`no-explicit-any`, `no-console`, restricted JSX attribute); Vitest renders hostile markup as text |
 
-## Commands executed (all passed at the final commit unless noted)
+## Commands executed (all passed after the review fixes, at `bd991ae`)
 
 ```
 backend$  uv run ruff check .            # All checks passed
-backend$  uv run ruff format --check .   # 18 files already formatted
-backend$  uv run pytest -q               # 96 passed
+backend$  uv run ruff format --check .   # 20 files already formatted
+backend$  uv run pytest -q               # 161 passed (96 before the review fixes)
 backend$  uv lock --check                # lock up to date
 frontend$ npm run lint                   # 0 problems (--max-warnings=0)
 frontend$ npm run format:check           # all files formatted
@@ -70,6 +70,20 @@ Local workerd smoke (no AI binding, `ENVIRONMENT=production`): `/api/health` 200
 valid request → 503 `SERVICE_MISCONFIGURED` (after rate limit + Pydantic validation ran in
 Pyodide); inconsistent pages → 400; scanned → 422; foreign origin → 403; preflight → 204;
 wrong content type → 415; chunked oversize → 413; 7 rapid requests → `503×5, 429×2`.
+
+Review-fix workerd checks (20 MB chunked uploads with curl, after `ccc0fa5`):
+
+| Request | Result |
+|---|---|
+| `POST /api/analyze/` (trailing slash) | 404 in ~5 ms, 0 bytes uploaded |
+| `POST /unknown` | 404 in ~4 ms, 0 bytes uploaded |
+| `PUT /api/analyze`, `PATCH /api/health` | 405 in ~4 ms, 0 bytes uploaded |
+| `DELETE /api/analyze`, `GET /api/analyze` | 405 |
+| `OPTIONS /api/analyze` (preflight) | 204 |
+| `POST /api/analyze`, `POST /api/%61nalyze` | 413 after ~1 s (body read stops at the limit; curl had pushed ~2 MB into socket buffers) |
+| previous smoke script | unchanged results; no Python traceback in the workerd log |
+
+404/405 responses use FastAPI's default `{"detail": ...}` body, not the API error envelope.
 
 Browser checks (in-app Chromium, 360×780): real pdf.js extraction of the sample contract; error
 paths against the local Worker; success rendering and cancel against a local stub that returned a
@@ -97,6 +111,20 @@ contract fixture (**stub = mock, not AI output**). No horizontal overflow at 360
 9. In-app preview server runner could not access `~/Documents` (macOS "Operation not permitted");
    servers were started from the shell instead.
 
+### Fixed after Codex review (docs/REVIEW_STAGE1.md)
+
+10. **P1 unbounded bodies** (`ccc0fa5`): only `POST /api/analyze` was bounded; trailing slash,
+    unknown paths and other methods reached the adapter, which queues the whole body. Also
+    `read_limited` retained a whole chunk before truncating. Fixed as described above; the new
+    entrypoint tests fail on the previous `worker.py` (10 of 16 failed when checked).
+11. **P1 incomplete model output accepted** (`bd991ae`): `build_result` used `get(..., [])`
+    defaults, so missing keys looked like empty results and no retry happened. Reproduced with the
+    reviewer's case (HTTP 200, 1 call) before fixing; 20 of the 45 new tests failed on the old
+    code (one of them only because `ModelOutput` did not exist yet).
+12. While writing the fix-1 tests, one test passed `str` header keys to a callback that receives
+    `bytes`; corrected the test. A local curl run first failed because zsh does not word-split
+    `$O`; rerun with explicit arguments.
+
 ## Release gates still open
 
 - Live Workers AI run on the sample contract: Polish output, type `umowa`, date 2026-03-12,
@@ -106,10 +134,14 @@ contract fixture (**stub = mock, not AI output**). No horizontal overflow at 360
 - Upload-to-result <30 s on the deployed demo (measure extraction + network + AI + retry).
 - Rate limiting behaviour on Cloudflare (bindings deployed, 429 observed).
 - GitHub Pages live URL, refresh, pdf.js worker load (`.mjs` MIME), screenshot, 14-day availability.
+- Total latency budget: two 25 s model attempts can exceed the <30 s target; decide a total
+  deadline from live measurements (review note).
+- Multi-column extraction meaning preservation on the supplied PDF (review note).
 
 ## Next steps (proposed)
 
-1. Reviewer decision; then human Cloudflare login and backend deploy, live measurements above.
+1. Codex re-review of `ccc0fa5` and `bd991ae`; then human Cloudflare login and backend deploy,
+   live measurements above.
 2. Tune prompt/model only from measured failures; record in AI_LOG.md.
 3. GitHub repo + Pages deploy via manual workflow; README demo link and screenshot.
 4. SHOULD: F-08 chunking (page-based, merge + dedupe), F-09 local history. COULD: F-10 OCR for

@@ -35,6 +35,19 @@ Rules enforced by the server (browser metadata is untrusted):
 The response `document.fileName` and `document.pages` are copied from the
 validated request; the model never produces them.
 
+Only `POST /api/analyze` reads a request body. Any other path (including
+`/api/analyze/`) or method is answered (404/405, or 204 for an allowed preflight)
+without reading its body.
+
+### Model output (internal)
+
+The JSON requested from the model (`MODEL_OUTPUT_SCHEMA`) is validated strictly
+before normalisation: all 12 keys (`insufficientContent`, `language`, `type`,
+`title`, `date`, `summary`, `keyPoints`, `organizations`, `people`, `amounts`,
+`dates`, `keywords`) must be present with the right types. Only `title` and
+`date` may be `null`; lists may be `[]`. A missing key or wrong type is invalid
+output and triggers the single retry; it is never read as an empty result.
+
 ## Response (200)
 
 All brief keys are required. `analysis` is a documented extension added by this
