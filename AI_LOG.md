@@ -101,3 +101,31 @@ word-split, producing invalid-header 400s from the dev proxy (rerun with explici
 Checks after the fixes: backend ruff/format clean, pytest 161 passed; frontend lint, format,
 typecheck clean, Vitest 81 passed, `/pdf-insight/` build with worker path check passed. No
 deployment, no live AI, no paid APIs.
+
+## 2026-10-05 — Live Workers AI checkpoint (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Codex принял исправления. Прочитай раздел Re-review at
+392fdd1 в docs/REVIEW_STAGE1.md и выполни следующий checkpoint: реальный Workers AI через локальный
+pywrangler. Сначала помоги мне авторизоваться в Cloudflare и проверить бесплатный план. Никаких
+платных подключений; секреты в чат не запрашивай. Проверь тестовый PDF: польское резюме, суммы и
+даты, JSON, игнорирование инъекции на странице 4, предупреждение о странице 11, время ответа.
+Максимум три полных анализа до следующего ревью. Результаты запиши в docs/LIVE_AI_RESULTS.md.
+Пока без публикации. При необходимости моего действия дай точную инструкцию.»
+
+Actions and blockers, in order:
+- `wrangler whoami`: not authenticated. Gave the user `npx wrangler login` instructions; the first
+  attempt (run through the chat's `!` input) timed out waiting for the OAuth callback; the user then
+  logged in from a terminal. Claude never read or printed the stored credentials.
+- The user confirmed Workers Free (active) and no payment method in Billing (screenshot).
+- Added `618d798` (log model call and token usage counters) to measure neurons per analysis.
+- Model catalog check without inference: Llama 3.3 70B fp8-fast, 24 000-token context.
+- `pywrangler dev` failed: "You need to register a workers.dev subdomain before running the dev
+  command in remote mode". The user registered the subdomain in the dashboard (account setting).
+- Run 1 (committed 25 s timeout): 504 `AI_TIMEOUT`. Claude raised the per-attempt timeout to 60 s
+  in the ignored local `.dev.vars` only, to measure real latency. Runs 2–3: 200 in ~30 s,
+  identical results, 20/24 automated checks. Stopped at three analyses as instructed.
+
+Observations about the model (not Claude's code): it kept the injection out and grounded all
+amounts and dates, but omitted the gross amount and invoice/payment dates and dropped net/period
+qualifiers and legal forms. Claude's own planning error surfaced here: the 25 s per-attempt default
+chosen in Stage 1 was never measured and is too short for this document.

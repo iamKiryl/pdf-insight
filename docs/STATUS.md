@@ -27,7 +27,7 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 |---|---|---|---|
 | F-01 | Drag & drop and chooser, PDF ≤10 MB | Implemented, tested | `FileDropzone`; `checkFile` (type/extension, 10 MiB boundary), `%PDF-` signature; Vitest `files.test.ts`, `useAnalysisFlow.test.tsx`; browser: docx, fake .pdf, >10 MB, corrupt, password-protected all rejected with Polish messages |
 | F-02 | Text-layer extraction per page | Implemented, tested locally | pdf.js in browser, `itemsToText` line rebuild + NFC; browser run on the 12-page sample: 12 pages, page 11 detected without text, 20 701 chars, no split Polish diacritics. Multi-column rows interleave (limitation) |
-| F-03 | 3–5 sentence summary in document language, no fabrication | Implemented (prompt + validation); **quality unverified** | Sentence interval validator on both sides with shared cases; prompt rules for language/type/no totals; needs live model run |
+| F-03 | 3–5 sentence summary in document language, no fabrication | Implemented; **live-checked on the sample only** | Live local run (docs/LIVE_AI_RESULTS.md): Polish 5-sentence factual summary, injection ignored, all amounts/dates grounded; gaps: gross amount, invoice/payment dates, net/period qualifiers missing |
 | F-04 | Strict schema, validated before display, one retry | Implemented, tested (mocks) | Pydantic + Zod with 3 accepted / 28 rejected shared fixtures; pytest retry tests (retry once then success; second failure → 502, no third call; JSON-mode failure retried; provider errors not retried) |
 | F-05 | Readable result, JSON preview, download | Implemented, tested | `ResultView`; Vitest checks preview string == downloaded string and round-trips through the schema; browser render at 360 px (stub data) |
 | F-06 | Empty / loading / error / retry states | Implemented, tested | States in `useAnalysisFlow`; Vitest: stale response ignored after cancel, manual retry only; browser: cancel during analysis returns to ready, error focus |
@@ -125,13 +125,23 @@ contract fixture (**stub = mock, not AI output**). No horizontal overflow at 360
     `bytes`; corrected the test. A local curl run first failed because zsh does not word-split
     `$O`; rerun with explicit arguments.
 
+## Live AI checkpoint (local pywrangler, real binding) — see docs/LIVE_AI_RESULTS.md
+
+Three analyses of the sample contract on a Workers Free account without a payment method:
+run 1 → 504 `AI_TIMEOUT` with the committed 25 s per-attempt timeout; runs 2–3 (local 60 s
+override) → 200, identical valid results, 1 model call each, 9 119 / 622 tokens (≈ 371 neurons),
+server 30.1–30.5 s, upload-to-render 30.4–30.8 s. Evaluation 20/24: type, language, date, parties,
+page-11 warning, injection resistance and grounding pass; gross amount, signing/invoice/payment
+dates missing. The live retry path was not exercised.
+
 ## Release gates still open
 
-- Live Workers AI run on the sample contract: Polish output, type `umowa`, date 2026-03-12,
-  page 4 injection ignored, amounts distinguished, no combined totals, page 11 reported.
+- Decide the timeout/latency policy: the committed 25 s timeout fails the sample every time and a
+  single call already takes ~30 s (live checkpoint). Fix quality gaps, then re-measure.
 - Additional real PDFs (other languages/types), not only the sample.
-- CPU time per request on Workers Free; AI neurons per analysis and per retry; daily capacity.
-- Upload-to-result <30 s on the deployed demo (measure extraction + network + AI + retry).
+- CPU time per request on Workers Free (not measurable locally); neurons measured locally ≈ 371
+  per successful analysis of the sample (~26/day on the free allocation).
+- Upload-to-result <30 s on the deployed demo (locally 30.4–30.8 s without retry — not met yet).
 - Rate limiting behaviour on Cloudflare (bindings deployed, 429 observed).
 - GitHub Pages live URL, refresh, pdf.js worker load (`.mjs` MIME), screenshot, 14-day availability.
 - Total latency budget: two 25 s model attempts can exceed the <30 s target; decide a total
@@ -140,8 +150,9 @@ contract fixture (**stub = mock, not AI output**). No horizontal overflow at 360
 
 ## Next steps (proposed)
 
-1. Codex re-review of `ccc0fa5` and `bd991ae`; then human Cloudflare login and backend deploy,
-   live measurements above.
+1. Codex review of the live checkpoint (docs/LIVE_AI_RESULTS.md): choose timeout/latency policy
+   and approve prompt (or model) changes; then deploy the backend and measure production CPU and
+   latency.
 2. Tune prompt/model only from measured failures; record in AI_LOG.md.
 3. GitHub repo + Pages deploy via manual workflow; README demo link and screenshot.
 4. SHOULD: F-08 chunking (page-based, merge + dedupe), F-09 local history. COULD: F-10 OCR for
