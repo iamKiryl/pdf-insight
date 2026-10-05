@@ -8,6 +8,7 @@ DEFAULT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 DEV_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
 
 Environment = Literal["production", "development"]
+Mode = Literal["single", "chunked"]
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class Settings:
     allowed_origins: frozenset[str]
     max_body_bytes: int
     ai_model: str
+    ai_mode: Mode  # "single" (default) or the experimental "chunked"
     ai_timeout_seconds: float  # ceiling for a single model call
     ai_total_budget_seconds: float  # ceiling for all model calls of one request (incl. retry)
     ai_max_tokens: int
@@ -56,6 +58,7 @@ def load_settings(get: Callable[[str], str | None]) -> Settings:
         allowed_origins=origins,
         max_body_bytes=_int(get("MAX_BODY_BYTES"), 262_144, 1_024, 1_048_576),
         ai_model=get("AI_MODEL") or DEFAULT_MODEL,
+        ai_mode="chunked" if get("AI_MODE") == "chunked" else "single",
         ai_timeout_seconds=_float(get("AI_TIMEOUT_SECONDS"), 40.0, 1.0, 60.0),
         ai_total_budget_seconds=_float(get("AI_TOTAL_BUDGET_SECONDS"), 55.0, 1.0, 90.0),
         ai_max_tokens=_int(get("AI_MAX_TOKENS"), 2048, 256, 4096),

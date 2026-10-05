@@ -37,6 +37,7 @@ def test_health_does_not_call_model():
         "environment": "production",
         "aiBinding": True,
         "rateLimiter": True,
+        "mode": "single",
     }
     assert ai.calls == []
 
@@ -428,6 +429,7 @@ def test_logs_usage_on_failure_and_ignores_malformed_usage(capsys):
         "event": "analyze",
         "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
         "promptVersion": PROMPT_VERSION,
+        "mode": "single",
         "pageCount": 2,
         "pagesWithoutText": 0,
         "textChars": line["textChars"],

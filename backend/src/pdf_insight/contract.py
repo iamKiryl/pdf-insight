@@ -11,7 +11,8 @@ from .sentences import sentence_count_within
 
 MAX_PAGES = 500
 MAX_PAGE_CHARS = 20_000
-MAX_TOTAL_CHARS = 48_000
+MAX_TOTAL_CHARS = 64_000  # request text envelope (AI_MODE=chunked processes all of it)
+SINGLE_CALL_MAX_CHARS = 48_000  # single-call model budget (AI_MODE=single, the default)
 MIN_TOTAL_LETTERS = 200
 SUMMARY_SENTENCES = (3, 5)
 KEY_POINTS = (3, 7)

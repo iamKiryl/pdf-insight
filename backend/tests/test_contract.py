@@ -59,6 +59,13 @@ def test_limits_mirror_contract():
     assert limits["maxPages"] == contract.MAX_PAGES
     assert limits["maxPageChars"] == contract.MAX_PAGE_CHARS
     assert limits["maxTotalChars"] == contract.MAX_TOTAL_CHARS
+    assert limits["singleCallMaxChars"] == contract.SINGLE_CALL_MAX_CHARS
+    from pdf_insight import chunked, chunking
+
+    assert limits["chunkMaxChars"] == chunking.CHUNK_MAX_CHARS
+    assert limits["chunkOverlapChars"] == chunking.CHUNK_OVERLAP_CHARS
+    assert limits["maxChunks"] == chunking.MAX_CHUNKS
+    assert limits["maxConcurrentModelCalls"] == chunked.MAX_CONCURRENT_CALLS
     assert limits["minTotalLetters"] == contract.MIN_TOTAL_LETTERS
     assert tuple(limits["summarySentences"]) == contract.SUMMARY_SENTENCES
     assert tuple(limits["keyPoints"]) == contract.KEY_POINTS

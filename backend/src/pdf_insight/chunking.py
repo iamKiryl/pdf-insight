@@ -18,13 +18,13 @@ cover 68 500 >= MAX_CHUNKED_CHARS = 64 000, so the envelope always fits in MAX_C
 
 from dataclasses import dataclass
 
-from .contract import AnalyzeRequest, has_letter
+from .contract import MAX_TOTAL_CHARS, AnalyzeRequest, has_letter
 
 CHUNK_MAX_CHARS = 10_000
 CHUNK_OVERLAP_CHARS = 300
 BOUNDARY_WINDOW = 1_000
 MAX_CHUNKS = 8
-MAX_CHUNKED_CHARS = 64_000  # request text envelope; equals contract.MAX_TOTAL_CHARS
+MAX_CHUNKED_CHARS = MAX_TOTAL_CHARS  # request text envelope
 
 
 class TooManyChunks(Exception):

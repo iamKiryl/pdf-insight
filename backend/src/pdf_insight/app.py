@@ -9,7 +9,9 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from .analyzer import ModelUsage, analyze
-from .contract import MAX_TOTAL_CHARS, MIN_TOTAL_LETTERS, AnalyzeRequest
+from .chunked import ChunkedStats, analyze_chunked
+from .config import Settings
+from .contract import MAX_TOTAL_CHARS, MIN_TOTAL_LETTERS, SINGLE_CALL_MAX_CHARS, AnalyzeRequest
 from .errors import ApiError
 from .logs import log_event
 from .middleware import BodyLimitMiddleware, CorsMiddleware
@@ -36,7 +38,7 @@ async def _enforce_rate_limit(runtime: Runtime, client_key: str) -> None:
         raise ApiError("RATE_LIMITED")
 
 
-def _parse_request(body: bytes) -> AnalyzeRequest:
+def _parse_request(body: bytes, settings: Settings) -> AnalyzeRequest:
     try:
         data: Any = json.loads(body)
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -45,8 +47,9 @@ def _parse_request(body: bytes) -> AnalyzeRequest:
         request = AnalyzeRequest.model_validate(data)
     except ValidationError:
         raise ApiError("INVALID_REQUEST") from None
-    if request.total_chars > MAX_TOTAL_CHARS:
-        raise ApiError("DOCUMENT_TOO_LONG")
+    limit = SINGLE_CALL_MAX_CHARS if settings.ai_mode == "single" else MAX_TOTAL_CHARS
+    if request.total_chars > limit:
+        raise ApiError("DOCUMENT_TOO_LONG")  # explicit; text is never truncated
     if len(request.pagesWithoutText) == request.pageCount:
         raise ApiError("NO_TEXT_LAYER")
     if request.total_letters < MIN_TOTAL_LETTERS:
@@ -76,6 +79,7 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
             "environment": runtime.settings.environment,
             "aiBinding": runtime.ai is not None,
             "rateLimiter": runtime.ip_limiter is not None and runtime.global_limiter is not None,
+            "mode": runtime.settings.ai_mode,
         }
 
     @api.post("/api/analyze")
@@ -88,9 +92,11 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
             "promptVersion": PROMPT_VERSION,
         }
         usage = ModelUsage()
+        chunk = ChunkedStats()
+        fields["mode"] = runtime.settings.ai_mode
         try:
             await _enforce_rate_limit(runtime, request.headers.get("cf-connecting-ip", "unknown"))
-            parsed = _parse_request(await request.body())
+            parsed = _parse_request(await request.body(), runtime.settings)
             fields |= {
                 "pageCount": parsed.pageCount,
                 "pagesWithoutText": len(parsed.pagesWithoutText),
@@ -98,21 +104,34 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
             }
             if runtime.ai is None:
                 raise ApiError("SERVICE_MISCONFIGURED")
-            outcome = await analyze(parsed, runtime.ai, runtime.settings, usage)
+            if runtime.settings.ai_mode == "chunked":
+                outcome = await analyze_chunked(parsed, runtime.ai, runtime.settings, usage, chunk)
+            else:
+                outcome = await analyze(parsed, runtime.ai, runtime.settings, usage)
         except ApiError as exc:
-            fields |= usage.log_fields()
+            fields |= usage.log_fields() | _chunk_fields(runtime.settings, chunk)
             log_event(**fields, outcome=exc.code, status=exc.spec.status, ms=_ms(started))
             return _error_response(exc)
         except Exception:
-            fields |= usage.log_fields()
+            fields |= usage.log_fields() | _chunk_fields(runtime.settings, chunk)
             log_event(**fields, outcome="INTERNAL_ERROR", status=500, ms=_ms(started))
             return _error_response(ApiError("INTERNAL_ERROR"))
-        fields |= usage.log_fields()
+        fields |= usage.log_fields() | _chunk_fields(runtime.settings, chunk)
         log_event(**fields, outcome="ok", status=200, attempts=outcome.attempts, ms=_ms(started))
         return JSONResponse(outcome.result.model_dump(mode="json"))
 
     app: Any = BodyLimitMiddleware(api, runtime_factory)
     return CorsMiddleware(app, runtime_factory)
+
+
+def _chunk_fields(settings: Settings, stats: ChunkedStats) -> dict[str, int]:
+    if settings.ai_mode != "chunked":
+        return {}
+    return {
+        "chunks": stats.chunks,
+        "droppedFacts": stats.dropped_facts,
+        "duplicateFacts": stats.duplicate_facts,
+    }
 
 
 def _ms(started: float) -> int:

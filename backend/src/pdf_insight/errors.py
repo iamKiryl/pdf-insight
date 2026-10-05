@@ -20,8 +20,8 @@ ERRORS: dict[str, ErrorSpec] = {
     ),
     "DOCUMENT_TOO_LONG": ErrorSpec(
         413,
-        "Dokument jest zbyt długi do analizy w jednym kroku. Dzielenie długich dokumentów "
-        "nie jest jeszcze dostępne — tekst nie zostanie obcięty.",
+        "Dokument przekracza długość tekstu obsługiwaną przez tę usługę. Tekst nie jest "
+        "obcinany — użyj krótszego dokumentu.",
         False,
     ),
     "UNSUPPORTED_MEDIA_TYPE": ErrorSpec(415, "Nieobsługiwany format żądania.", False),

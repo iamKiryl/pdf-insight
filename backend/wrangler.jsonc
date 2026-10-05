@@ -20,6 +20,9 @@
     "ALLOWED_ORIGINS": "",
     "MAX_BODY_BYTES": "262144",
     "AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    // "single" (default): one model call. "chunked": experimental chunk extraction + merge
+    // (docs/CHUNKING.md); not the default until compared on real AI.
+    "AI_MODE": "single",
     // Failure ceilings (not a latency target): one model call ≤ 40 s, all calls of a request ≤ 55 s.
     "AI_TIMEOUT_SECONDS": "40",
     "AI_TOTAL_BUDGET_SECONDS": "55",
