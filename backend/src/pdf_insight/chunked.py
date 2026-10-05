@@ -36,6 +36,7 @@ from .chunking import Chunk, TooManyChunks, build_chunks
 from .config import Settings
 from .contract import AnalyzeRequest
 from .errors import ApiError
+from .logs import log_model_call
 from .merge import (
     GroundedChunk,
     OverviewOutput,
@@ -66,6 +67,26 @@ class ChunkedStats:
     chunks: int = 0
     duplicate_facts: int = 0
     retries: int = 0
+
+
+def call_details(raw: Any) -> dict[str, Any]:
+    """Token usage and finish reason of one response, when the provider reports them."""
+    details: dict[str, Any] = {}
+    if not isinstance(raw, dict):
+        return details
+    usage = raw.get("usage")
+    if isinstance(usage, dict):
+        for source, target in (("prompt_tokens", "promptTokens"),
+                               ("completion_tokens", "completionTokens")):  # fmt: skip
+            if isinstance(usage.get(source), int) and not isinstance(usage.get(source), bool):
+                details[target] = usage[source]
+    reason = raw.get("finish_reason")
+    choices = raw.get("choices")
+    if reason is None and isinstance(choices, list) and choices and isinstance(choices[0], dict):
+        reason = choices[0].get("finish_reason")
+    if isinstance(reason, str):
+        details["finishReason"] = reason[:40]
+    return details
 
 
 class _RetryBudget:
@@ -117,26 +138,43 @@ async def analyze_chunked(
 
     async def call(spec: CallSpec) -> Any:
         messages = spec.messages
+        attempt = 0
         while True:
             async with gate:
                 remaining = deadline - clock()
                 if remaining <= 0:
                     raise ApiError("AI_TIMEOUT")
                 inputs = build_inputs(profile, messages, spec.schema, spec.max_tokens)
+                attempt += 1
                 usage.start()
+                started = time.monotonic()
                 raw_text = ""
+                record: dict[str, Any] = {"label": spec.label, "attempt": attempt}
+
+                def done(outcome: str, problems: list[str] | None = None) -> None:
+                    ms = round((time.monotonic() - started) * 1000)  # noqa: B023 - this attempt
+                    log_model_call(problems, outcome=outcome, ms=ms, **record)  # noqa: B023
+
                 try:
                     raw = await analyzer._wait_for(
                         ai.run(settings.ai_model, inputs),
                         timeout=min(settings.ai_timeout_seconds, remaining),
                     )
                     usage.complete(raw)
+                    record |= call_details(raw)
                     payload = _parse_payload(raw)
                     raw_text = json.dumps(payload, ensure_ascii=False)
-                    return spec.parse(payload)
+                    parsed = spec.parse(payload)
+                    done("ok")
+                    return parsed
                 except TimeoutError:
+                    done("timeout")
                     raise ApiError("AI_TIMEOUT") from None
+                except asyncio.CancelledError:
+                    done("cancelled")
+                    raise
                 except AIProviderError as exc:
+                    done(f"provider_{exc.kind}")
                     if exc.kind == "quota":
                         raise ApiError("AI_QUOTA_EXCEEDED") from None
                     if exc.kind != "invalid_output":
@@ -144,6 +182,7 @@ async def analyze_chunked(
                     problems = ["the model could not produce JSON matching the schema"]
                 except InvalidModelOutput as exc:
                     problems = exc.problems
+                    done("invalid_output", problems)
             if deadline - clock() < MIN_RETRY_SECONDS:
                 raise ApiError("AI_TIMEOUT")
             if not retries.take():

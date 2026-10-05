@@ -322,3 +322,63 @@ def test_calls_are_not_started_after_the_deadline(monkeypatch):
     assert outcome == "AI_TIMEOUT"
     assert timeouts == [40, 40]  # the two queued chunk calls were never dispatched
     assert usage.started == 2
+
+
+# ------------------------------------------------------------------ per-call logs
+
+
+def call_lines(capsys) -> list[dict]:
+    lines = [json.loads(line) for line in capsys.readouterr().out.strip().splitlines()]
+    return [line for line in lines if line["event"] == "model_call"]
+
+
+def test_every_model_call_is_logged_with_label_attempt_outcome_and_usage(capsys):
+    marker = "TAJNY-TEKST-STRONY"
+    texts = [THREE_PAGES[0] + " " + marker, *THREE_PAGES[1:]]
+    ai = ScriptedAI({"overview": OVERVIEW, "chunk-2": [{"amounts": "zle"}, EMPTY]})
+    assert post(ai, make_request(texts)).status_code == 200
+    out = capsys.readouterr().out
+    assert marker not in out  # no source text in any log line
+    lines = [json.loads(line) for line in out.strip().splitlines()]
+    calls = [line for line in lines if line["event"] == "model_call"]
+    assert sorted((c["label"], c["attempt"], c["outcome"]) for c in calls) == [
+        ("chunk-1", 1, "ok"),
+        ("chunk-2", 1, "invalid_output"),
+        ("chunk-2", 2, "ok"),
+        ("chunk-3", 1, "ok"),
+        ("overview", 1, "ok"),
+    ]
+    invalid = next(c for c in calls if c["outcome"] == "invalid_output")
+    assert invalid["problems"][0] == "amounts: Input should be a valid list"
+    assert "dates: Field required" in invalid["problems"]  # field paths and reasons only
+    assert all(c["promptTokens"] == 10 and c["completionTokens"] == 5 for c in calls)
+    assert all(isinstance(c["ms"], int) for c in calls)
+
+
+def test_evidence_rejection_reasons_are_logged_as_field_paths(capsys):
+    unsupported = {**EMPTY, "amounts": [amount(999, "kwota 999 zł, której nie ma", 1)]}
+    ai = ScriptedAI({"overview": OVERVIEW, "chunk-1": [unsupported, unsupported]})
+    post(ai, make_request(THREE_PAGES))
+    rejected = [c for c in call_lines(capsys) if c["outcome"] == "invalid_output"]
+    assert [c["problems"] for c in rejected] == [
+        ["amounts.0.evidence: not found verbatim in the text of this part"]
+    ] * 2
+
+
+def test_cancelled_calls_are_logged(capsys):
+    never = asyncio.Event()
+    ai = ScriptedAI({"overview": never, "chunk-1": AIProviderError("unavailable")})
+    post(ai, make_request(THREE_PAGES))
+    outcomes = {(c["label"], c["outcome"]) for c in call_lines(capsys)}
+    assert ("chunk-1", "provider_unavailable") in outcomes
+    assert ("overview", "cancelled") in outcomes
+
+
+def test_finish_reason_is_logged_when_the_provider_reports_it():
+    from pdf_insight.chunked import call_details
+
+    usage = {"prompt_tokens": 3, "completion_tokens": 2048}
+    raw = {"choices": [{"finish_reason": "length"}], "usage": usage}
+    assert call_details(raw) == {"promptTokens": 3, "completionTokens": 2048,
+                                 "finishReason": "length"}  # fmt: skip
+    assert call_details({"response": {}}) == {}
