@@ -121,16 +121,16 @@ def test_different_events_on_the_same_date_stay_separate():
         amount(10000, "USD", "x", "wdrożenie wynosi 10 000,00 zł netto"),  # currency contradicts
     ],
 )
-def test_ungrounded_amounts_are_dropped_and_counted(bad):
-    grounded = ground_chunk(REQUEST, CHUNK, output(amounts=[bad]))
-    assert grounded.amounts == [] and grounded.dropped == 1
+def test_ungrounded_amounts_make_the_chunk_output_invalid(bad):
+    with pytest.raises(InvalidModelOutput):  # never dropped silently (docs/REVIEW_CHUNKING.md)
+        ground_chunk(REQUEST, CHUNK, output(amounts=[bad]))
 
 
-def test_ungrounded_date_is_dropped():
-    grounded = ground_chunk(REQUEST, CHUNK, output(dates=[
-        date("2026-12-24", "Wymyślona", "Odbiór końcowy nastąpi 30.06.2026 r.", page=2),
-    ]))  # fmt: skip
-    assert grounded.dates == [] and grounded.dropped == 1
+def test_ungrounded_date_makes_the_chunk_output_invalid():
+    with pytest.raises(InvalidModelOutput):
+        ground_chunk(REQUEST, CHUNK, output(dates=[
+            date("2026-12-24", "Wymyślona", "Odbiór końcowy nastąpi 30.06.2026 r.", page=2),
+        ]))  # fmt: skip
 
 
 def test_page_is_taken_from_where_the_evidence_is_found():

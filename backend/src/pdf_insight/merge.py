@@ -1,9 +1,10 @@
 """Validation, evidence grounding and deterministic merging of chunk outputs (pure functions).
 
 Merge rules (docs/CHUNKING.md):
-- A fact is kept only if its quoted evidence occurs in one of the chunk's pages (after whitespace,
-  quote and dash normalisation) and the value/date occurs in that evidence. The page is taken from
-  where the evidence is found, not from the model. Ungrounded facts are dropped and counted.
+- Every fact must cite evidence that occurs in one of the chunk's pages (after whitespace, quote
+  and dash normalisation) and contains the value/date; the page is taken from where the evidence is
+  found, not from the model. Any unsupported fact makes the whole chunk output invalid (it goes
+  through the request's single correction retry); nothing is dropped silently.
 - Amounts are never added up and never merged across currency, basis, period or status. Two
   entries collapse only when value, currency, qualifiers and normalised context are identical AND
   they cite the very same source occurrence (same page and offsets, e.g. text seen twice through
@@ -188,7 +189,6 @@ class GroundedChunk:
     organizations: list[str] = field(default_factory=list)
     people: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
-    dropped: int = 0
 
 
 def _locate(evidence: str, preferred: int, chunk: Chunk):
@@ -210,33 +210,47 @@ def _locate(evidence: str, preferred: int, chunk: Chunk):
 
 
 def ground_chunk(request: AnalyzeRequest, chunk: Chunk, output: ChunkOutput) -> GroundedChunk:
+    """Attach every fact to the source occurrence it cites, or raise InvalidModelOutput listing the
+    unsupported facts (field paths and reasons only, never the quoted text)."""
+    problems: list[str] = []
     grounded = GroundedChunk(
         organizations=_clean_list(output.organizations),
         people=_clean_list(output.people),
         keywords=_clean_list(output.keywords),
     )
-    for amount in output.amounts:
+    for i, amount in enumerate(output.amounts):
         where = _locate(amount.evidence, amount.page, chunk)
         tokens = amounts_on_page(0, amount.evidence) if where else []
         matching = [t for t in tokens if as_decimal(t.value) == as_decimal(amount.value)]
         currency = amount.currency.upper()
-        if not where or not matching or any(t.currency not in (None, currency) for t in matching):
-            grounded.dropped += 1
+        if not where:
+            problems.append(f"amounts.{i}.evidence: not found verbatim in the text of this part")
+            continue
+        if not matching:
+            problems.append(f"amounts.{i}.value: not present in the quoted evidence")
+            continue
+        if any(t.currency not in (None, currency) for t in matching):
+            problems.append(f"amounts.{i}.currency: contradicts the quoted evidence")
             continue
         page, start, end = where
         grounded.amounts.append(GroundedAmount(
             amount.value, currency, amount.basis, amount.period, amount.status,
             amount.context.strip(), page, start, end, chunk.index,
         ))  # fmt: skip
-    for date in output.dates:
+    for i, date in enumerate(output.dates):
         where = _locate(date.evidence, date.page, chunk)
-        if not where or date.date not in dates_on_page(date.evidence):
-            grounded.dropped += 1
+        if not where:
+            problems.append(f"dates.{i}.evidence: not found verbatim in the text of this part")
+            continue
+        if date.date not in dates_on_page(date.evidence):
+            problems.append(f"dates.{i}.date: not present in the quoted evidence")
             continue
         page, start, end = where
         grounded.dates.append(
             GroundedDate(date.date, date.event.strip(), page, start, end, chunk.index)
         )
+    if problems:
+        raise InvalidModelOutput(problems)
     return grounded
 
 
@@ -330,7 +344,6 @@ def merge_organizations(names: list[str]) -> list[str]:
 
 @dataclass(frozen=True)
 class MergeStats:
-    dropped: int
     duplicate_amounts: int
     duplicate_dates: int
 
@@ -374,5 +387,5 @@ def merge(
         result = AnalysisResult.model_validate(candidate)
     except ValidationError as exc:
         raise InvalidModelOutput(_describe(exc)) from None
-    stats = MergeStats(sum(c.dropped for c in chunks), dup_amounts, dup_dates)
+    stats = MergeStats(dup_amounts, dup_dates)
     return result, stats

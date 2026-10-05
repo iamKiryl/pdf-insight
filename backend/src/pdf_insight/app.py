@@ -129,7 +129,6 @@ def _chunk_fields(settings: Settings, stats: ChunkedStats) -> dict[str, int]:
         return {}
     return {
         "chunks": stats.chunks,
-        "droppedFacts": stats.dropped_facts,
         "duplicateFacts": stats.duplicate_facts,
     }
 

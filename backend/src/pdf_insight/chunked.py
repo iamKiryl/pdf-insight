@@ -4,7 +4,9 @@ Schedule: one overview call plus one call per chunk, all started together but li
 MAX_CONCURRENT_CALLS in flight; the overview is queued first. One overall deadline covers every
 call; each call gets min(AI_TIMEOUT_SECONDS, time left). At most ONE corrective retry is allowed
 for the whole request (not per chunk), and only for invalid output with enough time left.
-Timeouts, quota and provider errors are never retried. If any call fails, all other calls are
+Evidence grounding runs inside each chunk call's validation, so an unsupported fact is invalid
+output that uses the same single retry. Timeouts, quota and provider errors are never retried.
+If any call fails, all other calls are
 cancelled and the request fails: an incomplete extraction is never returned as a result.
 Concurrency does not guarantee a latency target.
 """
@@ -30,11 +32,18 @@ from .chunk_prompt import (
     build_chunk_messages,
     build_overview_messages,
 )
-from .chunking import TooManyChunks, build_chunks
+from .chunking import Chunk, TooManyChunks, build_chunks
 from .config import Settings
 from .contract import AnalyzeRequest
 from .errors import ApiError
-from .merge import OverviewOutput, ground_chunk, merge, parse_chunk_output, parse_overview
+from .merge import (
+    GroundedChunk,
+    OverviewOutput,
+    ground_chunk,
+    merge,
+    parse_chunk_output,
+    parse_overview,
+)
 from .models import build_inputs, profile_for
 from .prompt import correction_message
 from .runtime import AIClient, AIProviderError
@@ -55,7 +64,6 @@ class CallSpec:
 @dataclass
 class ChunkedStats:
     chunks: int = 0
-    dropped_facts: int = 0
     duplicate_facts: int = 0
     retries: int = 0
 
@@ -92,9 +100,14 @@ async def analyze_chunked(
 
     specs = [CallSpec("overview", build_overview_messages(request), OVERVIEW_OUTPUT_SCHEMA,
                       OVERVIEW_MAX_TOKENS, parse_overview)]  # fmt: skip
+
+    def chunk_parser(chunk: Chunk) -> Callable[[dict[str, Any]], GroundedChunk]:
+        # validation + evidence grounding: both inside the retry boundary of this call
+        return lambda payload: ground_chunk(request, chunk, parse_chunk_output(payload))
+
     specs += [
         CallSpec(f"chunk-{c.index}", build_chunk_messages(request, c, len(chunks)),
-                 CHUNK_OUTPUT_SCHEMA, settings.ai_max_tokens, parse_chunk_output)
+                 CHUNK_OUTPUT_SCHEMA, settings.ai_max_tokens, chunk_parser(c))
         for c in chunks
     ]  # fmt: skip
 
@@ -151,12 +164,10 @@ async def analyze_chunked(
     overview: OverviewOutput = results[0]
     if overview.insufficientContent:
         raise ApiError("INSUFFICIENT_CONTENT")
-    grounded = [ground_chunk(request, chunk, out) for chunk, out in zip(chunks, results[1:],
-                                                                         strict=True)]  # fmt: skip
+    grounded: list[GroundedChunk] = list(results[1:])
     try:
         result, merge_stats = merge(request, overview, grounded)
     except InvalidModelOutput:
         raise ApiError("AI_INVALID_OUTPUT") from None
-    stats.dropped_facts = merge_stats.dropped
     stats.duplicate_facts = merge_stats.duplicate_amounts + merge_stats.duplicate_dates
     return AnalysisOutcome(result, attempts=1 + stats.retries)
