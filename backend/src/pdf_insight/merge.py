@@ -5,10 +5,11 @@ Merge rules (docs/CHUNKING.md):
   quote and dash normalisation) and the value/date occurs in that evidence. The page is taken from
   where the evidence is found, not from the model. Ungrounded facts are dropped and counted.
 - Amounts are never added up and never merged across currency, basis, period or status. Two
-  entries collapse only when everything matches AND their evidence spans overlap on the same page
-  (the same text seen twice, e.g. through chunk overlap). Equal values elsewhere stay separate.
-- Dated events collapse only for the same date with overlapping evidence on one page, or the same
-  date with the same normalised event text. Different events on one date stay separate.
+  entries collapse only when value, currency, qualifiers and normalised context are identical AND
+  they cite the very same source occurrence (same page and offsets, e.g. text seen twice through
+  chunk overlap). Overlapping or shared quotes alone never establish identity.
+- Dated events collapse only for the same date, the same normalised event text and the same source
+  occurrence. Different events on one date — even citing one sentence — stay separate.
 - Chunk outputs are data: nothing in them is ever sent back to the model or executed.
 """
 
@@ -129,9 +130,31 @@ _QUOTES = str.maketrans(
 )  # fmt: skip
 
 
+def normalize_with_map(text: str) -> tuple[str, list[int]]:
+    """Normalise like ``normalize`` and return, for every output character, the index of the raw
+    character it came from, so a match in normalised text maps back to exact source offsets."""
+    out: list[str] = []
+    index: list[int] = []
+    for i, raw in enumerate(text):
+        char = raw.translate(_QUOTES)
+        if char.isspace():
+            if out and out[-1] != " ":
+                out.append(" ")
+                index.append(i)
+            continue
+        for folded in char.casefold():
+            out.append(folded)
+            index.append(i)
+    if out and out[-1] == " ":
+        out.pop()
+        index.pop()
+    return "".join(out), index
+
+
 def normalize(text: str) -> str:
-    text = unicodedata.normalize("NFC", text).translate(_QUOTES)
-    return re.sub(r"\s+", " ", text).strip().casefold()
+    """Evidence comparison form: NFC, ASCII quotes/dashes/spaces, collapsed whitespace, casefold.
+    Page text is expected in NFC already (the frontend normalises extracted text)."""
+    return normalize_with_map(unicodedata.normalize("NFC", text))[0]
 
 
 @dataclass(frozen=True)
@@ -143,7 +166,7 @@ class GroundedAmount:
     status: str
     context: str
     page: int
-    start: int  # position of the evidence in the normalised page text
+    start: int  # raw offsets of the cited occurrence in the page text
     end: int
     chunk: int
 
@@ -168,33 +191,32 @@ class GroundedChunk:
     dropped: int = 0
 
 
-def _locate(evidence: str, preferred: int, chunk: Chunk, pages: dict[int, str]):
-    """Find the evidence in the chunk's segments; return (page, start, end) in the normalised page
-    text, or None. The model's page is tried first, then the other pages of the chunk."""
+def _locate(evidence: str, preferred: int, chunk: Chunk):
+    """Find the evidence in THIS chunk's segments and return (page, start, end) as raw offsets in
+    the page text — the actual occurrence the chunk saw, not the first one on the page. The
+    model's page is tried first, then the chunk's other pages."""
     needle = normalize(evidence)
     if len(needle) < 3:
         return None
     candidates = [preferred] + [p for p in chunk.pages if p != preferred]
     for page in candidates:
-        if page not in chunk.pages:
-            continue
-        segment_text = " ".join(s.text for s in chunk.segments if s.page == page)
-        if needle in normalize(segment_text):
-            start = pages[page].find(needle)
-            if start != -1:
-                return page, start, start + len(needle)
+        for segment in (s for s in chunk.segments if s.page == page):
+            text, index = normalize_with_map(segment.text)
+            position = text.find(needle)
+            if position != -1:
+                base = segment.start - len(segment.overlap)
+                return page, base + index[position], base + index[position + len(needle) - 1] + 1
     return None
 
 
 def ground_chunk(request: AnalyzeRequest, chunk: Chunk, output: ChunkOutput) -> GroundedChunk:
-    pages = {p.page: normalize(p.text) for p in request.pages}
     grounded = GroundedChunk(
         organizations=_clean_list(output.organizations),
         people=_clean_list(output.people),
         keywords=_clean_list(output.keywords),
     )
     for amount in output.amounts:
-        where = _locate(amount.evidence, amount.page, chunk, pages)
+        where = _locate(amount.evidence, amount.page, chunk)
         tokens = amounts_on_page(0, amount.evidence) if where else []
         matching = [t for t in tokens if as_decimal(t.value) == as_decimal(amount.value)]
         currency = amount.currency.upper()
@@ -207,7 +229,7 @@ def ground_chunk(request: AnalyzeRequest, chunk: Chunk, output: ChunkOutput) -> 
             amount.context.strip(), page, start, end, chunk.index,
         ))  # fmt: skip
     for date in output.dates:
-        where = _locate(date.evidence, date.page, chunk, pages)
+        where = _locate(date.evidence, date.page, chunk)
         if not where or date.date not in dates_on_page(date.evidence):
             grounded.dropped += 1
             continue
@@ -254,8 +276,8 @@ def labelled_context(amount: GroundedAmount, language: str) -> str:
     return f"{amount.context} ({', '.join(missing)})" if missing else amount.context
 
 
-def _overlaps(a, b) -> bool:
-    return a.page == b.page and a.start < b.end and b.start < a.end
+def _same_occurrence(a, b) -> bool:
+    return (a.page, a.start, a.end) == (b.page, b.start, b.end)
 
 
 def merge_amounts(chunks: list[GroundedChunk]) -> tuple[list[GroundedAmount], int]:
@@ -266,7 +288,8 @@ def merge_amounts(chunks: list[GroundedChunk]) -> tuple[list[GroundedAmount], in
             k for k in kept
             if as_decimal(k.value) == as_decimal(amount.value) and k.currency == amount.currency
             and (k.basis, k.period, k.status) == (amount.basis, amount.period, amount.status)
-            and _overlaps(k, amount)
+            and normalize(k.context) == normalize(amount.context)
+            and _same_occurrence(k, amount)
         ]  # fmt: skip
         if same:
             duplicates += 1
@@ -279,22 +302,29 @@ def merge_dates(chunks: list[GroundedChunk]) -> tuple[list[GroundedDate], int]:
     kept: list[GroundedDate] = []
     duplicates = 0
     for date in (d for c in chunks for d in c.dates):
-        if any(k.date == date.date and (_overlaps(k, date) or normalize(k.event) ==
-                                        normalize(date.event)) for k in kept):  # fmt: skip
+        if any(k.date == date.date and normalize(k.event) == normalize(date.event)
+               and _same_occurrence(k, date) for k in kept):  # fmt: skip
             duplicates += 1
             continue
         kept.append(date)
     return sorted(kept, key=lambda d: (d.page, d.start, d.chunk)), duplicates
 
 
+_LEGAL_FORM = re.compile(
+    r"(sp\. ?z ?o\.? ?o\.?|sp\. ?k\.|sp\. ?j\.|s\.a\.|s\.k\.a\.|gmbh|ltd\.?|inc\.?|llc|ag)"
+)
+
+
 def merge_organizations(names: list[str]) -> list[str]:
-    """Case-insensitive de-duplication; a name that is a word-prefix of a longer listed name
-    (e.g. without its legal form) is dropped in favour of the longer one."""
+    """Case-insensitive de-duplication. The only alias rule: a name is dropped when another listed
+    name is exactly that name followed by a legal form ("Kwadrat Software" vs "Kwadrat Software
+    S.A."). Other shared prefixes ("Alfa" vs "Alfa Logistics") are distinct organisations."""
     unique = _clean_list(names)
     keys = [normalize(n) for n in unique]
     return [
         name for name, key in zip(unique, keys, strict=True)
-        if not any(other != key and other.startswith(key + " ") for other in keys)
+        if not any(other.startswith(key + " ") and _LEGAL_FORM.fullmatch(other[len(key) + 1:])
+                   for other in keys)
     ]  # fmt: skip
 
 

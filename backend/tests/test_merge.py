@@ -84,7 +84,8 @@ def test_equal_values_with_different_meaning_currency_or_period_stay_separate():
     assert stats.duplicate_amounts == 0
 
 
-def test_same_text_seen_twice_collapses_but_equal_values_elsewhere_do_not():
+def test_differently_worded_overlapping_quotes_are_not_assumed_identical():
+    """Overlapping quotes alone never establish identity (docs/REVIEW_CHUNKING.md)."""
     first = ground_chunk(REQUEST, CHUNK, output(amounts=[
         amount(10000, "PLN", "Wdrożenie", "Wynagrodzenie za wdrożenie wynosi 10 000,00 zł netto"),
     ]))  # fmt: skip
@@ -92,8 +93,8 @@ def test_same_text_seen_twice_collapses_but_equal_values_elsewhere_do_not():
         amount(10000, "PLN", "Wdrożenie (powtórzone)", "wdrożenie wynosi 10 000,00 zł"),
     ]))  # fmt: skip
     result, stats = merge(REQUEST, OVERVIEW, [first, again])
-    assert len(result.amounts) == 1
-    assert stats.duplicate_amounts == 1
+    assert len(result.amounts) == 2  # ambiguous: kept separate rather than guessed together
+    assert stats.duplicate_amounts == 0
 
 
 def test_different_events_on_the_same_date_stay_separate():
@@ -101,11 +102,15 @@ def test_different_events_on_the_same_date_stay_separate():
         date("2026-03-12", "Zawarcie umowy", "zawarta w dniu 12.03.2026 r."),
         date("2026-03-12", "Termin płatności faktury", "Termin płatności faktury: 12.03.2026",
              page=2),
-        date("2026-03-12", "Zawarcie umowy", "w dniu 12.03.2026"),  # same event again
+        date("2026-03-12", "Zawarcie umowy", "w dniu 12.03.2026"),  # overlapping, not identical
     ]))  # fmt: skip
     result, stats = merge(REQUEST, OVERVIEW, [grounded])
-    assert [d.context for d in result.dates] == ["Zawarcie umowy", "Termin płatności faktury"]
-    assert stats.duplicate_dates == 1
+    assert [d.context for d in result.dates] == [
+        "Zawarcie umowy",
+        "Zawarcie umowy",
+        "Termin płatności faktury",
+    ]
+    assert stats.duplicate_dates == 0
 
 
 @pytest.mark.parametrize(
