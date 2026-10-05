@@ -96,9 +96,9 @@ export function readinessMessage(problem: ReadinessProblem): UserMessage {
       return {
         title: 'Dokument jest zbyt długi',
         detail:
-          `Analiza obsługuje obecnie do ${LIMITS.maxTotalChars.toLocaleString('pl-PL')} znaków tekstu ` +
-          `(maks. ${LIMITS.maxPageChars.toLocaleString('pl-PL')} na stronę). Dzielenie długich ` +
-          'dokumentów nie jest jeszcze dostępne, a tekst nie jest obcinany.',
+          `Analiza obsługuje do ${LIMITS.maxTotalChars.toLocaleString('pl-PL')} znaków tekstu ` +
+          `(maks. ${LIMITS.maxPageChars.toLocaleString('pl-PL')} na stronę); w zależności od ` +
+          'konfiguracji usługi limit może być niższy. Tekst nie jest obcinany.',
         retryable: false,
       };
   }

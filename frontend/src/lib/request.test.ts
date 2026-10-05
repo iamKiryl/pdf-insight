@@ -31,9 +31,14 @@ describe('prepareRequest', () => {
   });
 
   it('reports instead of truncating long documents', () => {
-    const ready = prepareRequest(doc(Array.from({ length: 3 }, () => 'a'.repeat(19_000))));
+    // 4 × 16 001 = 64 004 chars: above the request envelope (contracts/limits.json)
+    const ready = prepareRequest(doc(Array.from({ length: 4 }, () => 'a'.repeat(16_001))));
     expect(ready.problem).toBe('document-too-long');
-    expect(ready.request.pages[0]?.text).toHaveLength(19_000);
+    expect(ready.request.pages[0]?.text).toHaveLength(16_001);
+    // 60 000 chars is beyond the old 48 000 limit but within the envelope
+    expect(prepareRequest(doc(Array.from({ length: 4 }, () => 'a'.repeat(15_000)))).problem).toBe(
+      null,
+    );
     expect(prepareRequest(doc(['a'.repeat(20_001)])).problem).toBe('page-too-long');
   });
 });
