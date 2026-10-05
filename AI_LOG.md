@@ -129,3 +129,35 @@ Observations about the model (not Claude's code): it kept the injection out and 
 amounts and dates, but omitted the gross amount and invoice/payment dates and dropped net/period
 qualifiers and legal forms. Claude's own planning error surfaced here: the 25 s per-attempt default
 chosen in Stage 1 was never measured and is too short for this document.
+
+## 2026-10-05 — AI tuning checkpoint (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Codex проверил живые результаты. Выполни
+docs/NEXT_AI_TUNING.md. Разрешено сравнение моделей внутри текущего Cloudflare Free. Максимум 6
+фактических вызовов модели, включая корректирующие повторы. Не сокращай полноту данных ради
+скорости и не подгоняй код под тестовый PDF. Без платных подключений и публикации. Обнови
+результаты, STATUS и AI_LOG, сделай логические коммиты.»
+
+What Claude did:
+- Observability (`a9c9560`): started vs completed model calls, usage-known flag, model id in logs.
+- Overall deadline and model profiles (`2e0f17f`): 55 s request budget, ≤ 40 s per call, retry
+  only with ≥ 5 s left, 65 s browser timeout; Workers-style vs OpenAI-style request/response per
+  model, unknown model fails closed.
+- Prompt v2 (`6ad12b9`): generic completeness rules; evaluator package with atomic checks and a
+  synthetic Polish offer (`9a4982e`).
+- Model availability checked in the account catalog before any call: the reviewer's
+  `@cf/meta/llama-3.1-8b-instruct` was absent; chose Gemma 4 26B-A4B (schema-confirmed
+  json_schema, 256k context) and recorded why the fp8 Llama 3.1 variant was not used.
+- Five live calls: 70B sample ×2 (30/45), 70B synthetic offer (51/53), Gemma sample (truncated at
+  2 048 tokens, retry stopped by the deadline). Stopped at five because one more analysis could
+  have needed two calls and exceeded the limit of six.
+
+Mistakes / issues found:
+- Claude's first prompt-v2 edit script turned backslash line continuations into one very long
+  line (Python string escape inside a heredoc); caught by ruff E501 and rewritten.
+- `run_live.py` read the worker log before wrangler flushed the line (serverLog null on run A);
+  fixed in `b44b03a`, run A's metadata patched from the log afterwards.
+- Model-side: the 70B under-extracts on the 12-page document despite explicit instructions and
+  once produced corrupted Polish characters on the offer; Gemma produced an overlong answer.
+- Claude's earlier assumption that latency would follow output length is not supported: ~30 s
+  appeared for 622–917 output tokens and 1.8k–9.4k input tokens alike.

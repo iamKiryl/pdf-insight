@@ -27,8 +27,8 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 |---|---|---|---|
 | F-01 | Drag & drop and chooser, PDF ≤10 MB | Implemented, tested | `FileDropzone`; `checkFile` (type/extension, 10 MiB boundary), `%PDF-` signature; Vitest `files.test.ts`, `useAnalysisFlow.test.tsx`; browser: docx, fake .pdf, >10 MB, corrupt, password-protected all rejected with Polish messages |
 | F-02 | Text-layer extraction per page | Implemented, tested locally | pdf.js in browser, `itemsToText` line rebuild + NFC; browser run on the 12-page sample: 12 pages, page 11 detected without text, 20 701 chars, no split Polish diacritics. Multi-column rows interleave (limitation) |
-| F-03 | 3–5 sentence summary in document language, no fabrication | Implemented; **live-checked on the sample only** | Live local run (docs/LIVE_AI_RESULTS.md): Polish 5-sentence factual summary, injection ignored, all amounts/dates grounded; gaps: gross amount, invoice/payment dates, net/period qualifiers missing |
-| F-04 | Strict schema, validated before display, one retry | Implemented, tested (mocks) | Pydantic + Zod with 3 accepted / 28 rejected shared fixtures; pytest retry tests (retry once then success; second failure → 502, no third call; JSON-mode failure retried; provider errors not retried) |
+| F-03 | 3–5 sentence summary in document language, no fabrication | Implemented; **quality gate not met on the long sample** | Prompt v2, 70B, atomic rubric: sample 30/45 (twice), synthetic offer 51/53; injection ignored and every amount/date grounded in all runs; long document still misses budget, rejected offer, share capitals, invoice/payment/annex dates and several qualifiers; Polish character corruption seen once (docs/LIVE_AI_RESULTS.md) |
+| F-04 | Strict schema, validated before display, one retry within an overall deadline | Implemented, tested (mocks) + one live retry | Pydantic + Zod with shared fixtures; retry only for invalid output and only with ≥ 5 s of the 55 s budget left (controlled-clock tests); live: Gemma's truncated first answer → retry → explicit `AI_TIMEOUT` at 55 s |
 | F-05 | Readable result, JSON preview, download | Implemented, tested | `ResultView`; Vitest checks preview string == downloaded string and round-trips through the schema; browser render at 360 px (stub data) |
 | F-06 | Empty / loading / error / retry states | Implemented, tested | States in `useAnalysisFlow`; Vitest: stale response ignored after cancel, manual retry only; browser: cancel during analysis returns to ready, error focus |
 | F-07 | Public GitHub Pages demo | **Pending** | Workflow builds with `/<repo>/` base and checks the pdf.js worker path; deploy job manual and not run |
@@ -51,12 +51,12 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 | Provider failure / timeout / quota | Done, tested (mocks) | pytest 502/503/504 mapping, error text classification |
 | No `any`, `console.log`, `dangerouslySetInnerHTML` | Enforced | ESLint rules (`no-explicit-any`, `no-console`, restricted JSX attribute); Vitest renders hostile markup as text |
 
-## Commands executed (all passed after the review fixes, at `bd991ae`)
+## Commands executed (all passed at `b44b03a`, after the AI tuning checkpoint)
 
 ```
 backend$  uv run ruff check .            # All checks passed
-backend$  uv run ruff format --check .   # 20 files already formatted
-backend$  uv run pytest -q               # 161 passed (96 before the review fixes)
+backend$  uv run ruff format --check .   # 26 files already formatted
+backend$  uv run pytest -q               # 194 passed (161 after the review fixes, 96 in Stage 1)
 backend$  uv lock --check                # lock up to date
 frontend$ npm run lint                   # 0 problems (--max-warnings=0)
 frontend$ npm run format:check           # all files formatted
@@ -132,27 +132,36 @@ run 1 → 504 `AI_TIMEOUT` with the committed 25 s per-attempt timeout; runs 2�
 override) → 200, identical valid results, 1 model call each, 9 119 / 622 tokens (≈ 371 neurons),
 server 30.1–30.5 s, upload-to-render 30.4–30.8 s. Evaluation 20/24: type, language, date, parties,
 page-11 warning, injection resistance and grounding pass; gross amount, signing/invoice/payment
-dates missing. The live retry path was not exercised.
+dates missing. The live retry path was not exercised. (The 20/24 rubric is retired; re-scored with
+the atomic rubric this result is 22/45.)
+
+## AI tuning checkpoint — see docs/LIVE_AI_RESULTS.md
+
+Five model calls (limit six): prompt v2 on Llama 3.3 70B → sample 30/45 in 35.4 s and 30.7 s,
+synthetic offer 51/53 in 31.3 s; Gemma 4 26B-A4B (the requested Llama 3.1 8B is not in the catalog)
+→ first answer cut at 2 048 tokens, retry stopped by the 55 s deadline (`AI_TIMEOUT`). No candidate
+meets quality and latency; the 70B stays the default. Recommended next option for review:
+page-based chunk extraction + deterministic merge (F-08).
 
 ## Release gates still open
 
-- Decide the timeout/latency policy: the committed 25 s timeout fails the sample every time and a
-  single call already takes ~30 s (live checkpoint). Fix quality gaps, then re-measure.
-- Additional real PDFs (other languages/types), not only the sample.
-- CPU time per request on Workers Free (not measurable locally); neurons measured locally ≈ 371
-  per successful analysis of the sample (~26/day on the free allocation).
-- Upload-to-result <30 s on the deployed demo (locally 30.4–30.8 s without retry — not met yet).
+- Latency: every 70B call so far took 30.1–35.4 s locally (inputs 1.8k–9.4k tokens); <30 s
+  upload-to-result is not met and must be re-measured on the deployed Worker. Failure ceilings
+  are now 40 s per call / 55 s per request / 65 s in the browser.
+- Completeness on long documents (sample 30/45): budget, rejected offer, share capitals,
+  invoice/payment/annex dates and qualifiers; Polish character fidelity in model output.
+- Additional real PDFs (other languages/types), not only the sample and one synthetic offer.
+- CPU time per request on Workers Free (not measurable locally); ≈ 406 neurons per 70B analysis of
+  the sample (fewer than 25 per day on the free allocation).
 - Rate limiting behaviour on Cloudflare (bindings deployed, 429 observed).
 - GitHub Pages live URL, refresh, pdf.js worker load (`.mjs` MIME), screenshot, 14-day availability.
-- Total latency budget: two 25 s model attempts can exceed the <30 s target; decide a total
-  deadline from live measurements (review note).
 - Multi-column extraction meaning preservation on the supplied PDF (review note).
 
 ## Next steps (proposed)
 
-1. Codex review of the live checkpoint (docs/LIVE_AI_RESULTS.md): choose timeout/latency policy
-   and approve prompt (or model) changes; then deploy the backend and measure production CPU and
-   latency.
+1. Codex review of the tuning checkpoint: decide on page-based chunk extraction + deterministic
+   merge (F-08) or another model comparison; then deploy the backend and measure production CPU
+   and latency.
 2. Tune prompt/model only from measured failures; record in AI_LOG.md.
 3. GitHub repo + Pages deploy via manual workflow; README demo link and screenshot.
 4. SHOULD: F-08 chunking (page-based, merge + dedupe), F-09 local history. COULD: F-10 OCR for
