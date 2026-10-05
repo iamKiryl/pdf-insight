@@ -15,8 +15,10 @@ request (≤ 64 000 chars of text)
   │                    page, exact excerpt), dated events (date, event, page, excerpt),
   │                    organisations, people, keywords
   │   (≤ 2 calls in flight, overview queued first, one overall deadline, ≤ 1 retry in total)
-  ├─ grounding: keep a fact only if its excerpt occurs on a page of that chunk and contains the
-  │             value/date; page taken from where the excerpt is found; others dropped + counted
+  ├─ grounding (inside each chunk call's validation): every fact's excerpt must occur in that
+  │             chunk's text and contain the value/date; the amount's currency and stated
+  │             qualifiers must be supported at that occurrence; otherwise the chunk output is
+  │             invalid → the request's single retry → failure (nothing is dropped silently)
   └─ merge → public AnalysisResult (same contract as single mode)
 ```
 
@@ -32,20 +34,36 @@ Code: `backend/src/pdf_insight/chunking.py`, `chunk_prompt.py`, `merge.py`, `chu
 - The overlap (≤ 300 chars, starting at a word boundary) lets a fact cut by a split be read whole
   from the continuation; a fact seen twice through the overlap collapses in the merge.
 
+## Grounding rules (revised after docs/REVIEW_CHUNKING.md)
+
+- The excerpt is located inside the chunk's own segments and mapped to exact raw offsets in the
+  page (not the first occurrence on the page).
+- Amounts: the number token must lie inside the cited occurrence; its currency comes from the
+  marker next to it or the page's "Waluta:"/"Currency:" line and must equal the claimed currency.
+  A short quote that omits the currency does not license any currency.
+- Each claimed basis/period/status other than unspecified/other/current must be named in the same
+  sentence or table row as the value (bounded to 200 characters each side). The sentence window is
+  a conservative heuristic (abbreviations such as "sp. z o.o." can shorten it), so legitimate facts
+  may be rejected; rejection is preferred to inventing a qualifier.
+- Any unsupported fact makes the chunk output invalid. Grounding runs inside the call's validation,
+  so it shares the request's single correction retry; an unresolved rejection fails the request
+  with AI_INVALID_OUTPUT. Text-layer coverage (`analysis.pagesWithoutText`) is unaffected.
+
 ## Merge rules
 
 - Never add up amounts; never merge across currency, net/gross/VAT basis, period or status.
-- Two amount entries collapse only when value, currency, basis, period and status match **and**
-  their excerpts overlap on the same page (the same text seen twice). Equal values elsewhere stay
-  separate — ambiguous facts are kept, not guessed together.
-- Dated events collapse only for the same date with overlapping excerpts on one page or the same
-  normalised event text; different events on one date stay separate.
-- Organisations: case-insensitive de-duplication; a name that is a word-prefix of a longer listed
-  name (typically missing the legal form) is dropped in favour of the longer one.
-- Structured qualifiers missing from the free-text context are appended in the document language
-  (Polish/English labels only, e.g. "(netto, miesięcznie)"). Note: the evaluator's keyword
-  qualifier checks will therefore pass whenever the model's structured fields are set — those
-  fields still need manual review.
+- Two amount entries collapse only when value, currency, basis, period, status and normalised
+  context are identical **and** they cite the very same source occurrence (same page and offsets,
+  e.g. text seen twice through chunk overlap). Overlapping or shared quotes alone never establish
+  identity — ambiguous facts are kept, not guessed together.
+- Dated events collapse only for the same date, the same normalised event and the same source
+  occurrence; different events on one date — even citing one sentence — stay separate.
+- Organisations: case-insensitive de-duplication; the only alias rule drops a name when another
+  listed name is exactly that name plus a legal form ("Kwadrat Software" / "Kwadrat Software
+  S.A."). Shared prefixes ("Alfa" / "Alfa Logistics") stay distinct.
+- Supported structured qualifiers missing from the free-text context are appended in the document
+  language (Polish/English labels only, e.g. "(netto, miesięcznie)"). Because the evaluator's
+  keyword checks then pass, context meaning still needs manual review.
 - Chunk outputs are data. They are never sent to another model call; injection text inside a
   chunk stays inside that chunk's `<document>` block.
 

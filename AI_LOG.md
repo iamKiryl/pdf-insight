@@ -221,3 +221,29 @@ instead of the scratchpad and deleted afterwards.
 
 Known risk recorded for review: with ~30 s per 70B call, the sample's 4 calls in two rounds likely
 exceed the 55 s budget. Nothing here is live-verified.
+
+## 2026-10-05 — Chunking review fixes (Claude Code, Opus, subscription; no live AI)
+
+Prompt (human → Claude, verbatim): «Прочитай docs/REVIEW_CHUNKING.md. Исправь только перечисленные
+дефекты, сначала добавив воспроизводящие их регрессионные тесты. Не увеличивай общий бюджет
+повторных вызовов. Сохрани AI_MODE=single по умолчанию. Без живых AI-вызовов и новых функций.
+Запусти проверки, обнови STATUS и AI_LOG, сделай отдельные fix-коммиты.»
+
+- Wrote 20 regression tests first (`test_merge_identity.py`, `test_evidence_support.py`,
+  `test_evidence_rejection.py`); 16 failed on the reviewed code, reproducing every finding.
+- `63b22b1`: merge identity requires identical meaning AND the same source occurrence; evidence is
+  located in the chunk's own segments with exact raw offsets (`normalize_with_map`); organisation
+  alias limited to "name + legal form".
+- `d284d52`: unsupported evidence raises InvalidModelOutput inside each chunk call's validation
+  (shared single retry), unresolved → AI_INVALID_OUTPUT; `droppedFacts` removed.
+- `0a80133`: amount tokens are taken from the cited occurrence (token offsets added to the parser);
+  currency must be stated there (marker or page "Waluta:" line); claimed qualifiers must be named
+  in the same sentence/table row (±200 chars).
+- Mistakes on the way: one new test first placed both repeated snippets inside the same chunk (the
+  layout was corrected, then it still failed on the old code as intended); earlier test fixtures
+  had claimed "one-off"/"monthly" periods the source did not state — exactly what the new rule
+  rejects — and their expected contexts contained the unsupported "jednorazowo" label; the
+  fixtures were corrected rather than the rule weakened. Two earlier merge tests encoded the
+  overlap-means-identical rule the review identified as a defect and were updated.
+- The sentence window is a heuristic; it can reject legitimate facts (e.g. qualifiers beyond an
+  abbreviation like "sp. z o.o."). That trade-off is documented and untested on real output.

@@ -32,7 +32,7 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 | F-05 | Readable result, JSON preview, download | Implemented, tested | `ResultView`; Vitest checks preview string == downloaded string and round-trips through the schema; browser render at 360 px (stub data) |
 | F-06 | Empty / loading / error / retry states | Implemented, tested | States in `useAnalysisFlow`; Vitest: stale response ignored after cancel, manual retry only; browser: cancel during analysis returns to ready, error focus |
 | F-07 | Public GitHub Pages demo | **Pending** | Workflow builds with `/<repo>/` base and checks the pdf.js worker path; deploy job manual and not run |
-| F-08 | Chunking long documents | **Implemented as opt-in experiment, mock-tested only** | `AI_MODE=chunked`: ≤ 8 chunks of ≤ 10 000 chars (up to 64 000 chars, proven + property-tested), overview + chunk calls with ≤ 2 in flight, one deadline, one retry per request, grounded deterministic merge (docs/CHUNKING.md). Tests with scripted responses: final-chunk facts, cut and overlap facts, equal values/dates with different meaning, injection, failing chunk with cancellation, deadline, concurrency, retry budget, > 48 000-char document. **No live AI run yet; default remains single-call.** |
+| F-08 | Chunking long documents | **Implemented as opt-in experiment, mock-tested only** | `AI_MODE=chunked`: ≤ 8 chunks of ≤ 10 000 chars (up to 64 000 chars, proven + property-tested), overview + chunk calls with ≤ 2 in flight, one deadline, one retry per request, grounded deterministic merge (docs/CHUNKING.md). After review fixes (`63b22b1`, `d284d52`, `0a80133`): merge keeps distinct obligations/events citing one sentence, equal snippets at different offsets and prefix-sharing organisations; currency and qualifiers must be stated at the cited occurrence; unsupported evidence invalidates the chunk within the single retry instead of being dropped. Tests with scripted responses only. **No live AI run yet; default remains single-call; not yet accepted for live testing.** |
 | F-09 | Local history | **Not implemented** | — |
 | F-10 | OCR | **Not implemented** | Partial-analysis warning and fully-scanned error only |
 
@@ -56,7 +56,7 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 ```
 backend$  uv run ruff check .            # All checks passed
 backend$  uv run ruff format --check .   # all files formatted
-backend$  uv run pytest -q               # 317 passed (237 at the evaluator checkpoint, 96 in Stage 1)
+backend$  uv run pytest -q               # 337 passed (317 before the chunking review fixes, 96 in Stage 1)
 backend$  uv lock --check                # lock up to date
 frontend$ npm run lint                   # 0 problems (--max-warnings=0)
 frontend$ npm run format:check           # all files formatted
@@ -162,6 +162,15 @@ sample contract: 3 chunks (pages 1–4, 5–9, 10 and 12) + overview = 4 calls, 
 neurons (single mode measured ≈ 406). Main risk: two call rounds at concurrency 2 with ~30 s per
 70B call exceed the 55 s budget, so the sample would likely time out unless chunk calls are
 faster — to be measured in the bounded live comparison.
+
+## Chunking review fixes — docs/REVIEW_CHUNKING.md
+
+Three defects reproduced first with 20 regression tests (16 failed on the reviewed code; output in
+`.local/live/chunk-review-regressions-before-fix.txt`), then fixed in separate commits:
+`63b22b1` merge identity (same occurrence + identical meaning only; exact offsets; legal-form-only
+organisation alias), `d284d52` unsupported evidence invalidates the chunk inside the single
+correction retry, `0a80133` currency/qualifiers resolved from the cited source occurrence. Retry
+budget (1 per request), deadline, cancellation and the single-call default are unchanged.
 
 ## Release gates still open
 
