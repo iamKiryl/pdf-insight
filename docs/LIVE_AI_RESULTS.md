@@ -296,3 +296,70 @@ to the result's SHA-256: (1) every summary sentence is supported by the cited pa
 point is supported and none contradicts an amount/date; (3) each amount/date context names the
 right fact (use the report's evidence table); (4) no corrupted characters or wrong-language words.
 The current 70B and Gemma results remain unaccepted regardless of corrected scoring.
+
+---
+
+# Chunked-mode live trial — 2026-10-05 (docs/REVIEW_CHUNKING.md, re-review of 06f389b)
+
+**Result: failed — `AI_TIMEOUT` (HTTP 504) after 40.0 s. No analysis result was produced.**
+One trial only, no automatic repetition, nothing published. Local `pywrangler dev`, real AI binding,
+same Workers Free account (no payment method).
+
+## Setup
+
+| Item | Value |
+|---|---|
+| Code | `ed4b255` (chunk fixes + per-call log events); prompt `v2-2026-10-05` (overview) / `chunk-v1-2026-10-05` (chunks) |
+| Mode | `AI_MODE=chunked` as a **local `.dev.vars` override only**, restored to the example afterwards; committed default stays `single` |
+| Limits (unchanged) | overall AI budget 55 s, ≤ 40 s per call, ≤ 2 calls in flight, ≤ 1 corrective retry per request, `max_tokens` 2048 (chunks) / 1024 (overview) |
+| Model | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` |
+| Input | the same saved sample request as all earlier runs (`.local/live/run2/request.json`, 20 701 chars, page 11 without text) |
+| Plan checked before calling | 3 chunks (pages 1–4, 5–9, 10 + 12) + overview = 4 calls, ≤ 5 with the retry; full text for the overview (no digest) |
+| Quota before the call | same UTC day; own accounting ≤ ~2 750 of 10 000 neurons used today; worst case of this trial ≈ 2 660 |
+| Evidence | `.local/live/tuning/E-chunked-sample/` (response, meta, evaluator report, worker log) |
+
+## What happened (per-call log)
+
+| Label | Attempt | Started | Outcome | Duration | Reported tokens (in / out) | Finish reason |
+|---|---|---|---|---|---|---|
+| overview | 1 | 0 s | ok | 20 257 ms | 8 934 / 437 | stop |
+| chunk-1 (pages 1–4) | 1 | 0 s | **timeout** (40 s per-call cap) | 40 013 ms | not reported | — |
+| chunk-2 (pages 5–9) | 1 | ≈ 20.3 s | cancelled | 19 760 ms | not reported | — |
+| chunk-3 (pages 10, 12) | 1 | ≈ 40.0 s | cancelled | 3 ms | not reported | — |
+
+Request summary: `modelCallsStarted` 4, `modelCallsCompleted` 1, `usageComplete` false, server
+40 042 ms, client 40 056 ms. No validation error occurred, so no corrective retry was used; the
+failure phase is **extraction** (chunk 1 did not finish within its 40 s cap; the overview had
+already succeeded). Evaluator v3: `failed` (HTTP 504). Manual review: nothing to review — the
+service returns no partial result and the overview's output is not persisted.
+
+## Findings
+
+1. **Per-call time is driven by output length.** Throughput across all 70B calls so far is about
+   20–29 output tokens per second (overview 437 tokens / 20.3 s; single-mode runs 622–917 tokens /
+   30–35 s). A 40 s cap therefore allows roughly 850–1 150 output tokens. Chunk 1 covers pages 1–4
+   (parties, budget, implementation price, VAT, gross, subscription, licences, hosting, payment
+   schedule table) and the chunk schema asks for an exact excerpt plus basis/period/status per
+   fact, so its answer is longer than the whole single-call answer for the document (763 tokens).
+   Splitting by characters did not make the densest chunk faster; the earlier conclusion that
+   ~30 s was "independent of size" is superseded.
+2. **The schedule cannot fit the budget for this document as configured.** Even if chunk 1 had
+   finished at 40 s, chunks 2 and 3 started at 20.3 s and 40 s with at most 34.7 s / 15 s left of
+   the 55 s budget.
+3. **Cancellation defect (new):** when chunk 1 timed out, its semaphore slot was released before
+   the failure cancelled the other tasks, so chunk 3 was dispatched to the provider and cancelled
+   3 ms later. After a failure no queued call should start. Recorded for review; not fixed in this
+   checkpoint.
+4. Grounding, merge and the retry path were not exercised by real output (no chunk completed).
+
+Quota: overview ≈ 328 neurons (reported). The three unfinished calls reported no usage; upper
+bounds from their prompt sizes and `max_tokens` are ≈ 547 / 545 / 476 neurons (chunk 3 was cancelled
+after 3 ms and probably consumed little, but this is unknown). Trial total ≤ ≈ 1 900 neurons.
+
+## Status after the trial
+
+Chunked mode remains **unaccepted** and is not the default. Nothing was weakened: grounding,
+deadline, concurrency, token caps and the retry budget are unchanged. Comparison with the single
+call on the same sample (prompt v2): single mode returned a valid result in 30.7–35.4 s (evaluator
+v3: failed on latency and missing facts); chunked mode returned no result within 40 s. The choice of
+the final approach is left to the architectural review.

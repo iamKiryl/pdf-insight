@@ -247,3 +247,25 @@ Prompt (human → Claude, verbatim): «Прочитай docs/REVIEW_CHUNKING.md.
   overlap-means-identical rule the review identified as a defect and were updated.
 - The sentence window is a heuristic; it can reject legitimate facts (e.g. qualifiers beyond an
   abbreviation like "sp. z o.o."). That trade-off is documented and untested on real output.
+
+## 2026-10-05 — Chunked-mode live trial (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Codex принял исправления. Выполни следующий checkpoint из раздела
+Re-review of 06f389b в docs/REVIEW_CHUNKING.md. Один анализ тестового договора с AI_MODE=chunked:
+максимум 5 фактических вызовов модели, включая коррекцию. Сохрани текущие ограничения времени и
+параллельности. Без автоматических повторных экспериментов и публикации. Проверь результат
+оценщиком и вручную по исходному документу. При неудаче зафиксируй точную причину, не ослабляй
+проверки. Обнови LIVE_AI_RESULTS, STATUS и AI_LOG.»
+
+- Added per-call `model_call` log events (`ed4b255`) because the checkpoint required per-call
+  label/timing/tokens/finish reason/validation reasons; tested that no source text is logged.
+- Checked quota by own accounting (dashboard not read) and the call plan offline (3 chunks +
+  overview, ≤ 5 calls) before calling; local `.dev.vars` override `AI_MODE=chunked`, restored
+  afterwards; limits unchanged.
+- Ran exactly one analysis: `AI_TIMEOUT` after 40.0 s. Overview ok (20.3 s, 8 934 / 437 tokens);
+  chunk 1 hit the 40 s per-call cap; chunks 2 and 3 cancelled; 4 calls started, 1 completed. No
+  result, so the evaluator reports `failed` and there was nothing to review manually. No repeat.
+- Claude's earlier claim that 70B latency was ~30 s "regardless of size" was wrong: with this
+  data point throughput is ~20–29 output tokens/s, so long, evidence-rich chunk answers are slow.
+- New defect found in Claude's orchestration: a queued call was dispatched (3 ms) after the failure
+  released its semaphore slot. Recorded, not fixed (checkpoint scope).
