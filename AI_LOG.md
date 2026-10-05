@@ -190,3 +190,34 @@ chunking, новых живых запросов и публикации.»
 ## 2026-10-05 — Codex evaluator re-review
 
 Reviewed 7fbae0e and independently repeated numeric, wrong-event and fabricated-summary probes. Observed corrected rejection/pending statuses. Ruff lint/format passed. Initial pytest: 232 passed, 5 errors from sandbox-denied localhost socket binding. After network permission for local test servers, full pytest: 237 passed. No provider calls. Next implementation task recorded in docs/NEXT_CHUNKING.md; mock results will not justify changing production default.
+
+## 2026-10-05 — Chunked extraction (F-08) implementation (Claude Code, Opus, subscription; no live AI)
+
+Prompt (human → Claude, verbatim): «Codex принял исправления оценщика. Выполни docs/NEXT_CHUNKING.md:
+реализуй извлечение по частям и безопасное объединение фактов, с ограничением параллельности,
+общего времени и повторов. На этом этапе без живых AI-вызовов и публикации. Не меняй основной
+режим на основании тестов с заглушками. Обнови документацию, запусти проверки и сделай логические
+коммиты.»
+
+Commits: `2130324` parser moved to `pdf_insight.numbers` (runtime grounding needs it), `9721ba0`
+chunk builder, `00714a2` typed chunk outputs + grounding + merge, `31c36c2` opt-in orchestration
+(`AI_MODE=chunked`), `42def19` frontend limit/message, plus this documentation commit.
+
+Decisions: parallel overview call (full text or digest of every page) instead of a sequential
+summary; ≤ 2 calls in flight; one overall deadline; one retry per request; any failure cancels the
+rest and fails the request; ungrounded facts dropped and counted; equal values never merged across
+meaning; request envelope 64 000 chars with a proven chunk bound; default stays single-call.
+
+Checks: tests use scripted provider responses only. Mutation check: raising the retry budget to 5
+or the concurrency to 5 made the corresponding tests fail, then the code was restored.
+
+Mistakes on the way: a chunking test assumed a paragraph break outside the boundary window would be
+used (the documented rule is the last 1 000 chars) and then exceeded the 20 000-char page limit;
+first drafts of `chunk_prompt.py` and `merge.py` contained dead code and stray try/except/imports,
+removed before committing; the file tool again turned ` ` escapes into literal characters
+(rewritten as escapes); the worst-case quota estimate was first understated (retry input) and
+corrected to ≈ 5 600 neurons; a temporary backup during the mutation check was written to /tmp
+instead of the scratchpad and deleted afterwards.
+
+Known risk recorded for review: with ~30 s per 70B call, the sample's 4 calls in two rounds likely
+exceed the 55 s budget. Nothing here is live-verified.
