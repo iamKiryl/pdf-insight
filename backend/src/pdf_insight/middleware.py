@@ -5,7 +5,9 @@ Both read settings at request time because Worker vars only exist per request (`
 
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable, MutableMapping
+from dataclasses import dataclass
 from typing import Any
+from urllib.parse import unquote
 
 from .errors import ERRORS, error_body
 from .runtime import RuntimeFactory
@@ -42,7 +44,33 @@ async def send_error(send: Send, code: str, extra=()) -> None:
 
 
 def is_bounded(method: str, path: str) -> bool:
+    """Only POST /api/analyze accepts a body. ``path`` is the decoded ASGI path (exact match, so
+    "/api/analyze/" is not bounded and its body is never read)."""
     return method == "POST" and path in BOUNDED_PATHS
+
+
+@dataclass(frozen=True)
+class BodyPlan:
+    """What the Worker entrypoint does with a request body before the ASGI adapter sees it."""
+
+    read_body: bool  # stream the body with a MAX_BODY_BYTES + 1 cap
+    keep_declared_length: bool  # forward headers unchanged so the app reports the precheck error
+
+
+def plan_body(method: str, raw_path: str, headers: Callable[[bytes], str | None], limit: int):
+    """Decide per request, from method, path and headers only, whether any body bytes are read.
+
+    The path is percent-decoded exactly like the Workers ASGI adapter does (``unquote`` of the URL
+    pathname), so routing here and in FastAPI cannot disagree. Every request that is not
+    POST /api/analyze (unknown paths, trailing slash, other methods, preflight) is forwarded without
+    its body; the app then answers 404/405/204 and the adapter never buffers the upload.
+    """
+    path = unquote(raw_path)
+    if not is_bounded(method, path):
+        return BodyPlan(read_body=False, keep_declared_length=False)
+    if body_precheck(method, path, headers, limit) is not None:
+        return BodyPlan(read_body=False, keep_declared_length=True)
+    return BodyPlan(read_body=True, keep_declared_length=False)
 
 
 def body_precheck(method: str, path: str, headers: Callable[[bytes], str | None], limit: int):
@@ -76,19 +104,21 @@ async def read_limited(chunks: AsyncIterator[bytes], limit: int) -> bytes:
     Returning ``limit + 1`` bytes signals overflow to the next size check without buffering the
     rest of the stream; the remaining chunks are not read.
     """
+    cap = limit + 1
     buffered: list[bytes] = []
     size = 0
     try:
         async for chunk in chunks:
-            buffered.append(chunk)
-            size += len(chunk)
-            if size > limit:
+            kept = chunk[: cap - size]  # never retain more than the cap, even from one huge chunk
+            buffered.append(kept)
+            size += len(kept)
+            if size >= cap:
                 break
     finally:
         closer = getattr(chunks, "aclose", None)
         if closer is not None:
             await closer()
-    return b"".join(buffered)[: limit + 1]
+    return b"".join(buffered)
 
 
 class CorsMiddleware:
@@ -134,8 +164,26 @@ class CorsMiddleware:
         await self.app(scope, receive, send_with_cors)
 
 
+def _without_body() -> Receive:
+    """Receive callable for requests whose body must not be read: an empty body, then disconnect.
+    It never calls the real ``receive``."""
+    sent = False
+
+    async def receive() -> Message:
+        nonlocal sent
+        if not sent:
+            sent = True
+            return {"type": "http.request", "body": b"", "more_body": False}
+        return {"type": "http.disconnect"}
+
+    return receive
+
+
 class BodyLimitMiddleware:
-    """Enforces content type, declared length and the actual streamed size before any parsing."""
+    """Enforces content type, declared length and the actual streamed size before any parsing.
+
+    Bodies of requests other than POST /api/analyze are never read.
+    """
 
     def __init__(self, app: ASGIApp, runtime_factory: RuntimeFactory) -> None:
         self.app = app
@@ -151,7 +199,7 @@ class BodyLimitMiddleware:
             await send_error(send, code)
             return
         if not is_bounded(scope["method"], scope["path"]):
-            await self.app(scope, receive, send)
+            await self.app(scope, _without_body(), send)  # same policy as the Worker entrypoint
             return
 
         chunks: list[bytes] = []

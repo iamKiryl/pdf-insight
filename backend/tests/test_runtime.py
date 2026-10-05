@@ -139,3 +139,50 @@ def test_streamed_body_beyond_declared_length_is_cut_off():
     assert received == 2  # stopped as soon as the limit was exceeded
     assert sent[0]["status"] == 413
     assert json.loads(sent[1]["body"])["error"]["code"] == "BODY_TOO_LARGE"
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [("POST", "/api/analyze/"), ("POST", "/nope"), ("PUT", "/api/analyze"), ("GET", "/api/health")],
+)
+def test_middleware_never_reads_body_outside_analyze(method, path):
+    """Mirror of the entrypoint policy at the ASGI level (review finding 1)."""
+    from pdf_insight.app import create_app
+
+    runtime = Runtime(
+        settings=load_settings({"ENVIRONMENT": "development"}.get),
+        ai=None,
+        ip_limiter=None,
+        global_limiter=None,
+    )
+    app = create_app(lambda _s: runtime)
+    reads = 0
+
+    async def receive():
+        nonlocal reads
+        reads += 1
+        return {"type": "http.request", "body": b"x" * 1_000_000, "more_body": True}
+
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": method,
+        "scheme": "https",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "root_path": "",
+        "headers": [(b"content-type", b"application/json")],
+        "client": ("203.0.113.1", 1),
+        "server": ("api.example", 443),
+    }
+    asyncio.run(app(scope, receive, send))
+    assert reads == 0
+    expected = {"/api/analyze/": 404, "/nope": 404, "/api/analyze": 405, "/api/health": 200}[path]
+    assert sent[0]["status"] == expected

@@ -54,7 +54,14 @@ def _parse_request(body: bytes) -> AnalyzeRequest:
 
 
 def create_app(runtime_factory: RuntimeFactory) -> Any:
-    api = FastAPI(title="PDF Insight API", docs_url=None, redoc_url=None, openapi_url=None)
+    # redirect_slashes=False: "/api/analyze/" is a plain 404, never a redirect that re-sends a body.
+    api = FastAPI(
+        title="PDF Insight API",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        redirect_slashes=False,
+    )
 
     @api.exception_handler(ApiError)
     async def _handle_api_error(_: Request, exc: ApiError) -> JSONResponse:
