@@ -371,3 +371,43 @@ def test_logs_never_contain_document_text_or_model_output(capsys):
     lines = [json.loads(line) for line in out.strip().splitlines()]
     assert lines[0]["outcome"] == "ok" and lines[0]["attempts"] == 2
     assert lines[1]["outcome"] == "AI_UNAVAILABLE"
+
+
+class UsageAI(FakeAI):
+    """Fake that also returns Workers AI-style token usage."""
+
+    async def run(self, model, inputs):
+        result = await super().run(model, inputs)
+        return {**result, "usage": {"prompt_tokens": 7000, "completion_tokens": 900}}
+
+
+def test_logs_model_calls_and_token_usage_across_retry(capsys):
+    ai = UsageAI(valid_model_output(keyPoints=["x"]), valid_model_output())
+    assert post(make_client(ai), make_request()).status_code == 200
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert line["modelCalls"] == 2
+    assert line["promptTokens"] == 14000
+    assert line["completionTokens"] == 1800
+
+
+def test_logs_usage_on_failure_and_ignores_malformed_usage(capsys):
+    class BadUsageAI(FakeAI):
+        async def run(self, model, inputs):
+            result = await super().run(model, inputs)
+            return {**result, "usage": {"prompt_tokens": "lots", "completion_tokens": True}}
+
+    ai = BadUsageAI("not json", "still not json")
+    assert post(make_client(ai), make_request()).status_code == 502
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert line == {
+        "event": "analyze",
+        "pageCount": 2,
+        "pagesWithoutText": 0,
+        "textChars": line["textChars"],
+        "modelCalls": 2,
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "outcome": "AI_INVALID_OUTPUT",
+        "status": 502,
+        "ms": line["ms"],
+    }

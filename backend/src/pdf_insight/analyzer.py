@@ -42,6 +42,36 @@ class AnalysisOutcome:
     attempts: int
 
 
+@dataclass
+class ModelUsage:
+    """Counters for operational logs and quota measurement (never content).
+
+    Workers AI text-generation responses include ``usage`` token counts; they are summed over all
+    attempts, including a failed first attempt, so neuron consumption per analysis can be measured.
+    """
+
+    calls: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+    def record(self, raw: Any) -> None:
+        self.calls += 1
+        usage = raw.get("usage") if isinstance(raw, dict) else None
+        if not isinstance(usage, dict):
+            return
+        for key in ("prompt_tokens", "completion_tokens"):
+            value = usage.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                setattr(self, key, getattr(self, key) + value)
+
+    def log_fields(self) -> dict[str, int]:
+        return {
+            "modelCalls": self.calls,
+            "promptTokens": self.prompt_tokens,
+            "completionTokens": self.completion_tokens,
+        }
+
+
 def fallback_title(language: str) -> str:
     return FALLBACK_TITLES.get(language, DEFAULT_FALLBACK_TITLE)
 
@@ -165,7 +195,13 @@ def _describe(exc: ValidationError) -> list[str]:
     ]
 
 
-async def analyze(request: AnalyzeRequest, ai: AIClient, settings: Settings) -> AnalysisOutcome:
+async def analyze(
+    request: AnalyzeRequest,
+    ai: AIClient,
+    settings: Settings,
+    usage: ModelUsage | None = None,
+) -> AnalysisOutcome:
+    usage = usage if usage is not None else ModelUsage()
     messages: list[dict[str, str]] = build_messages(request)
     problems: list[str] = []
     for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -180,6 +216,7 @@ async def analyze(request: AnalyzeRequest, ai: AIClient, settings: Settings) -> 
             raw = await asyncio.wait_for(
                 ai.run(settings.ai_model, inputs), timeout=settings.ai_timeout_seconds
             )
+            usage.record(raw)
             payload = _parse_payload(raw)
             raw_text = json.dumps(payload, ensure_ascii=False)
             return AnalysisOutcome(build_result(payload, request), attempt)

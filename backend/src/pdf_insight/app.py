@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from .analyzer import analyze
+from .analyzer import ModelUsage, analyze
 from .contract import MAX_TOTAL_CHARS, MIN_TOTAL_LETTERS, AnalyzeRequest
 from .errors import ApiError
 from .logs import log_event
@@ -82,6 +82,7 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
         started = time.monotonic()
         runtime = runtime_factory(request.scope)
         fields: dict[str, Any] = {"event": "analyze"}
+        usage = ModelUsage()
         try:
             await _enforce_rate_limit(runtime, request.headers.get("cf-connecting-ip", "unknown"))
             parsed = _parse_request(await request.body())
@@ -92,13 +93,16 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
             }
             if runtime.ai is None:
                 raise ApiError("SERVICE_MISCONFIGURED")
-            outcome = await analyze(parsed, runtime.ai, runtime.settings)
+            outcome = await analyze(parsed, runtime.ai, runtime.settings, usage)
         except ApiError as exc:
+            fields |= usage.log_fields()
             log_event(**fields, outcome=exc.code, status=exc.spec.status, ms=_ms(started))
             return _error_response(exc)
         except Exception:
+            fields |= usage.log_fields()
             log_event(**fields, outcome="INTERNAL_ERROR", status=500, ms=_ms(started))
             return _error_response(ApiError("INTERNAL_ERROR"))
+        fields |= usage.log_fields()
         log_event(**fields, outcome="ok", status=200, attempts=outcome.attempts, ms=_ms(started))
         return JSONResponse(outcome.result.model_dump(mode="json"))
 
