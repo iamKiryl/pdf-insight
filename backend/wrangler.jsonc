@@ -20,7 +20,9 @@
     "ALLOWED_ORIGINS": "",
     "MAX_BODY_BYTES": "262144",
     "AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-    "AI_TIMEOUT_SECONDS": "25",
+    // Failure ceilings (not a latency target): one model call ≤ 40 s, all calls of a request ≤ 55 s.
+    "AI_TIMEOUT_SECONDS": "40",
+    "AI_TOTAL_BUDGET_SECONDS": "55",
     "AI_MAX_TOKENS": "2048"
   },
   "observability": { "enabled": true }

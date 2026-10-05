@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,10 +12,14 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .config import Settings
 from .contract import AnalysisInfo, AnalysisResult, AnalyzeRequest
 from .errors import ApiError
+from .models import build_inputs, output_content, profile_for
 from .prompt import MODEL_OUTPUT_SCHEMA, build_messages, correction_message
 from .runtime import AIClient, AIProviderError
 
 MAX_ATTEMPTS = 2  # first call + exactly one retry, only for invalid output
+MIN_RETRY_SECONDS = 5.0  # a corrective retry needs at least this much of the overall budget left
+
+_wait_for = asyncio.wait_for  # indirection so tests can observe the per-call timeout
 
 FALLBACK_TITLES: dict[str, str] = {
     "pl": "Dokument bez tytułu",
@@ -136,8 +142,8 @@ def _clean_list(values: list[str]) -> list[str]:
 
 
 def _parse_payload(raw: Any) -> dict[str, Any]:
-    """Workers AI returns {"response": <object or JSON string>}; accept both shapes."""
-    payload = raw.get("response", raw) if isinstance(raw, dict) else raw
+    """Extract the JSON object from either Workers AI response style (object or JSON string)."""
+    payload = output_content(raw)
     if isinstance(payload, str):
         try:
             payload = json.loads(payload)
@@ -212,22 +218,32 @@ async def analyze(
     ai: AIClient,
     settings: Settings,
     usage: ModelUsage | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> AnalysisOutcome:
+    """Call the model with one overall deadline for the whole request.
+
+    Each call is limited by ``min(AI_TIMEOUT_SECONDS, time left)``; a corrective retry happens only
+    for invalid output and only when at least MIN_RETRY_SECONDS remain. Provider timeouts, quota and
+    availability errors are never retried. These limits are failure ceilings, not a latency target.
+    """
     usage = usage if usage is not None else ModelUsage()
+    profile = profile_for(settings.ai_model)
+    if profile is None:
+        raise ApiError("SERVICE_MISCONFIGURED")  # unknown model: request format cannot be trusted
+    deadline = clock() + settings.ai_total_budget_seconds
     messages: list[dict[str, str]] = build_messages(request)
     problems: list[str] = []
     for attempt in range(1, MAX_ATTEMPTS + 1):
-        inputs = {
-            "messages": messages,
-            "response_format": {"type": "json_schema", "json_schema": MODEL_OUTPUT_SCHEMA},
-            "max_tokens": settings.ai_max_tokens,
-            "temperature": 0.1,
-        }
+        remaining = deadline - clock()
+        if attempt > 1 and remaining < MIN_RETRY_SECONDS:
+            raise ApiError("AI_TIMEOUT")
+        inputs = build_inputs(profile, messages, MODEL_OUTPUT_SCHEMA, settings.ai_max_tokens)
         raw_text = ""
         try:
             usage.start()
-            raw = await asyncio.wait_for(
-                ai.run(settings.ai_model, inputs), timeout=settings.ai_timeout_seconds
+            raw = await _wait_for(
+                ai.run(settings.ai_model, inputs),
+                timeout=max(0.0, min(settings.ai_timeout_seconds, remaining)),
             )
             usage.complete(raw)
             payload = _parse_payload(raw)

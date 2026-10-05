@@ -12,6 +12,7 @@ export const LIMITS = {
   summarySentences: [limits.summarySentences[0] ?? 3, limits.summarySentences[1] ?? 5] as const,
   keyPoints: [limits.keyPoints[0] ?? 3, limits.keyPoints[1] ?? 7] as const,
   maxKeywords: limits.maxKeywords,
+  clientTimeoutMs: limits.clientTimeoutMs,
 } as const;
 
 export const LANGUAGES: ReadonlySet<string> = new Set(codes.languages);

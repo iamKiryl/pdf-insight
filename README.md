@@ -88,7 +88,8 @@ uv run pywrangler dev
 |---|---|---|
 | `backend/wrangler.jsonc` vars | `ENVIRONMENT` | `production` (default, fail closed) or `development` (adds localhost origins, allows running without rate-limit bindings) |
 | | `ALLOWED_ORIGINS` | comma-separated origins, e.g. `https://<user>.github.io` (no path) |
-| | `MAX_BODY_BYTES`, `AI_MODEL`, `AI_TIMEOUT_SECONDS`, `AI_MAX_TOKENS` | limits and model settings |
+| | `MAX_BODY_BYTES`, `AI_MODEL`, `AI_MAX_TOKENS` | limits and model settings (`AI_MODEL` must be one of the profiled models in `backend/src/pdf_insight/models.py`, otherwise the API fails closed) |
+| | `AI_TIMEOUT_SECONDS` (40), `AI_TOTAL_BUDGET_SECONDS` (55) | failure ceilings: one model call / all calls of a request; the browser gives up after 65 s |
 | `backend/.dev.vars` (git-ignored) | same names | local overrides; see `.dev.vars.example` |
 | `frontend/.env.local` (git-ignored) | `VITE_API_URL` | public backend URL (not a secret) |
 | GitHub repository variable | `VITE_API_URL` | backend URL baked into the Pages build |

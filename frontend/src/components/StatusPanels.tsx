@@ -106,7 +106,7 @@ export function AnalyzingStatus(props: {
       <div className="spinner" aria-hidden="true" />
       <p>
         Czas: <span className="tabular">{formatSeconds(elapsed)}</span>. Model AI czyta tekst i
-        wyodrębnia dane; zwykle trwa to kilkanaście sekund.
+        wyodrębnia dane; może to potrwać kilkadziesiąt sekund.
       </p>
       <button type="button" className="button" onClick={props.onCancel}>
         Anuluj analizę

@@ -10,6 +10,8 @@ describe('shared contract data', () => {
     const limits = loadJson('../limits.json') as Record<string, unknown>;
     expect(LIMITS.maxTotalChars).toBe(limits.maxTotalChars);
     expect(LIMITS.maxFileBytes).toBe(10 * 1024 * 1024);
+    expect(LIMITS.clientTimeoutMs).toBe(limits.clientTimeoutMs);
+    expect(LIMITS.clientTimeoutMs).toBeGreaterThan(Number(limits.aiTotalBudgetSeconds) * 1000);
     expect(CURRENCIES.has('XXX')).toBe(false);
   });
 

@@ -63,3 +63,8 @@ def test_limits_mirror_contract():
     assert tuple(limits["summarySentences"]) == contract.SUMMARY_SENTENCES
     assert tuple(limits["keyPoints"]) == contract.KEY_POINTS
     assert limits["maxKeywords"] == contract.MAX_KEYWORDS
+    defaults = load_settings(lambda _: None)
+    assert limits["aiAttemptTimeoutSeconds"] == defaults.ai_timeout_seconds
+    assert limits["aiTotalBudgetSeconds"] == defaults.ai_total_budget_seconds
+    # the browser waits longer than the server's whole AI budget, so it sees the server's answer
+    assert limits["clientTimeoutMs"] > limits["aiTotalBudgetSeconds"] * 1000

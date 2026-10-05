@@ -1,7 +1,10 @@
+import { LIMITS } from '../lib/contract';
 import { ApiErrorSchema, AnalysisResultSchema } from '../lib/schema';
 import type { AnalysisResult, AnalyzeRequest } from '../lib/schema';
 
-export const CLIENT_TIMEOUT_MS = 70_000; // server: up to 2 model attempts of 25 s each
+// Longer than the server's overall AI budget (contracts/limits.json), so the server's own timeout
+// error normally arrives first. A failure ceiling, not a latency target.
+export const CLIENT_TIMEOUT_MS = LIMITS.clientTimeoutMs;
 
 export type ClientErrorCode =
   | 'NETWORK_ERROR'

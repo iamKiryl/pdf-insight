@@ -11,7 +11,7 @@ export function App() {
     <div className="page">
       <header className="masthead">
         <h1>PDF Insight</h1>
-        <p>Podsumowanie i dane strukturalne z dokumentu PDF w kilkanaście sekund.</p>
+        <p>Podsumowanie i dane strukturalne z dokumentu PDF.</p>
       </header>
 
       <main id="main" className="content">
