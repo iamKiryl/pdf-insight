@@ -29,13 +29,21 @@ def load_case(case_id: str) -> tuple[dict, dict]:
     return case, json.loads((ROOT / source["localRequest"]).read_text(encoding="utf-8"))
 
 
-def last_log_line(path: pathlib.Path | None) -> dict | None:
+def log_lines(path: pathlib.Path | None) -> list[str]:
     if path is None or not path.exists():
-        return None
-    lines = [
-        ln for ln in path.read_text(errors="replace").splitlines() if ln.startswith('{"event"')
-    ]
-    return json.loads(lines[-1]) if lines else None
+        return []
+    text = path.read_text(errors="replace")
+    return [line for line in text.splitlines() if line.startswith('{"event"')]
+
+
+def new_log_line(path: pathlib.Path | None, seen: int) -> dict | None:
+    """The dev server writes its log line asynchronously; wait briefly for the new one."""
+    for _ in range(50):
+        lines = log_lines(path)
+        if len(lines) > seen:
+            return json.loads(lines[-1])
+        time.sleep(0.1)
+    return None
 
 
 def main() -> None:
@@ -60,6 +68,7 @@ def main() -> None:
         method="POST",
         headers={"Content-Type": "application/json", "Origin": args.origin},
     )
+    seen = len(log_lines(args.worker_log))
     started = time.monotonic()
     try:
         with urllib.request.urlopen(http, timeout=70) as response:
@@ -69,7 +78,7 @@ def main() -> None:
     elapsed_ms = round((time.monotonic() - started) * 1000)
 
     (out / "response.json").write_bytes(payload)
-    log = last_log_line(args.worker_log)
+    log = new_log_line(args.worker_log, seen)
     meta = {"case": args.case, "status": status, "clientMs": elapsed_ms, "serverLog": log}
     report = None
     if status == 200:
