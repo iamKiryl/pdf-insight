@@ -27,7 +27,7 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 |---|---|---|---|
 | F-01 | Drag & drop and chooser, PDF ≤10 MB | Implemented, tested | `FileDropzone`; `checkFile` (type/extension, 10 MiB boundary), `%PDF-` signature; Vitest `files.test.ts`, `useAnalysisFlow.test.tsx`; browser: docx, fake .pdf, >10 MB, corrupt, password-protected all rejected with Polish messages |
 | F-02 | Text-layer extraction per page | Implemented, tested locally | pdf.js in browser, `itemsToText` line rebuild + NFC; browser run on the 12-page sample: 12 pages, page 11 detected without text, 20 701 chars, no split Polish diacritics. Multi-column rows interleave (limitation) |
-| F-03 | 3–5 sentence summary in document language, no fabrication | Implemented; **quality gate not met on the long sample** | Prompt v2, 70B, atomic rubric: sample 30/45 (twice), synthetic offer 51/53; injection ignored and every amount/date grounded in all runs; long document still misses budget, rejected offer, share capitals, invoice/payment/annex dates and several qualifiers; Polish character corruption seen once (docs/LIVE_AI_RESULTS.md) |
+| F-03 | 3–5 sentence summary in document language, no fabrication | Implemented; **quality gate not met; summaries not manually reviewed** | Prompt v2, 70B, evaluator v3: sample 44/65 (twice), synthetic offer 68/72, all failed (latency, missing facts, one wrong date event); summary facts need a human review that has not happened; injection ignored and every amount/date grounded in all runs; long document still misses budget, rejected offer, share capitals, invoice/payment/annex dates and several qualifiers; Polish character corruption seen once (docs/LIVE_AI_RESULTS.md) |
 | F-04 | Strict schema, validated before display, one retry within an overall deadline | Implemented, tested (mocks) + one live retry | Pydantic + Zod with shared fixtures; retry only for invalid output and only with ≥ 5 s of the 55 s budget left (controlled-clock tests); live: Gemma's truncated first answer → retry → explicit `AI_TIMEOUT` at 55 s |
 | F-05 | Readable result, JSON preview, download | Implemented, tested | `ResultView`; Vitest checks preview string == downloaded string and round-trips through the schema; browser render at 360 px (stub data) |
 | F-06 | Empty / loading / error / retry states | Implemented, tested | States in `useAnalysisFlow`; Vitest: stale response ignored after cancel, manual retry only; browser: cancel during analysis returns to ready, error focus |
@@ -51,12 +51,12 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 | Provider failure / timeout / quota | Done, tested (mocks) | pytest 502/503/504 mapping, error text classification |
 | No `any`, `console.log`, `dangerouslySetInnerHTML` | Enforced | ESLint rules (`no-explicit-any`, `no-console`, restricted JSX attribute); Vitest renders hostile markup as text |
 
-## Commands executed (all passed at `b44b03a`, after the AI tuning checkpoint)
+## Commands executed (all passed at `dc495b7`, after the evaluator v3 fixes)
 
 ```
 backend$  uv run ruff check .            # All checks passed
-backend$  uv run ruff format --check .   # 27 files already formatted
-backend$  uv run pytest -q               # 194 passed (161 after the review fixes, 96 in Stage 1)
+backend$  uv run ruff format --check .   # 31 files already formatted
+backend$  uv run pytest -q               # 237 passed (194 at the tuning checkpoint, 96 in Stage 1)
 backend$  uv lock --check                # lock up to date
 frontend$ npm run lint                   # 0 problems (--max-warnings=0)
 frontend$ npm run format:check           # all files formatted
@@ -143,12 +143,24 @@ synthetic offer 51/53 in 31.3 s; Gemma 4 26B-A4B (the requested Llama 3.1 8B is 
 meets quality and latency; the 70B stays the default. Recommended next option for review:
 page-based chunk extraction + deterministic merge (F-08).
 
+## Evaluator v3 and offline re-evaluation — see docs/LIVE_AI_RESULTS.md
+
+The audit (docs/REVIEW_EVALUATION.md) showed the evaluator accepted wrong date events, keyword-soup
+contexts, a wrong file name and nonsense summaries, and mis-parsed numbers. Reproduced with six
+failing tests, then fixed (`6ccc699`, `aaadd61`, `dc495b7`): bounded currency-aware number
+parsing, page+snippet evidence for every expected fact, qualifiers and events judged on the same
+entry, schema/metadata/coverage checks, and explicit `needs_manual_review` for summary, key points,
+context meaning and language fidelity (never counted as passed). `run_live --check` exits 0/1/2.
+All saved responses re-scored offline: every run is **failed** (baseline 33/63, prompt-v2 70B
+44/65 on the sample, 68/72 on the synthetic offer; Gemma and baseline 1 failed by HTTP 504).
+Scores are per-document check counts, not accuracy; no result is accepted.
+
 ## Release gates still open
 
 - Latency: every 70B call so far took 30.1–35.4 s locally (inputs 1.8k–9.4k tokens); <30 s
   upload-to-result is not met and must be re-measured on the deployed Worker. Failure ceilings
   are now 40 s per call / 55 s per request / 65 s in the browser.
-- Completeness on long documents (sample 30/45): budget, rejected offer, share capitals,
+- Completeness on long documents (sample 44/65 under evaluator v3): budget, rejected offer, share capitals,
   invoice/payment/annex dates and qualifiers; Polish character fidelity in model output.
 - Additional real PDFs (other languages/types), not only the sample and one synthetic offer.
 - CPU time per request on Workers Free (not measurable locally); ≈ 406 neurons per 70B analysis of

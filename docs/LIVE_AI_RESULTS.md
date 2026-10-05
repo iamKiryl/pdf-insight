@@ -221,3 +221,78 @@ Production CPU on Workers Free, deployed latency, Rate Limiting on Cloudflare, q
 real documents/languages, sample completeness (budget, rejected offer, capitals, invoice/payment
 dates, qualifiers), Polish character fidelity in model output, GitHub Pages, screenshot,
 14-day availability.
+
+---
+
+# Offline re-evaluation with evaluator v3 — 2026-10-05 (docs/REVIEW_EVALUATION.md)
+
+No model calls, no network: the saved responses above were re-scored with
+`backend/evaluation` version **eval-v3-2026-10-05** (`6ccc699`, `aaadd61`, `dc495b7`). The
+original results and earlier evaluations are kept unchanged as historical records; each saved run
+now also has `evaluation-eval-v3-2026-10-05.json` next to it under `.local/`.
+
+## Why the earlier scores were not trustworthy
+
+The audit's six reproductions all passed the old evaluator (verified with failing tests before the
+fix): an amount 123 was "found" inside 9 123,00; 12.34 USD was not found; date strings were matched
+without their event; qualifier keywords were accepted from keyword soup; a wrong `fileName` passed;
+a nonsense summary was never judged. The 20/24 and 22/45 / 30/45 / 51/53 numbers above are
+therefore superseded; they remain only as history.
+
+## What v3 checks — and what it does not
+
+Automatic (conservative, keyword- and token-based): schema, HTTP status, file name/pages/coverage,
+document fields, legal names, every expected amount with the same currency, its stated qualifiers
+on the **same** entry and no contradicting qualifier or negation, every expected date with its
+event named in the context, injection markers, grounding of every amount (bounded number token with
+the same currency) and every date in the source, and measured latency < 30 s. Each expected fact
+cites a readable page and an exact snippet (validated against the source; nothing from page 11).
+
+Not decided automatically (status `needs_manual_review` until a human reviews the exact result):
+summary facts, key-point facts, the full meaning of contexts, language fidelity. The evaluator
+reports an evidence table for them; it never counts them as passed. Event and qualifier checks are
+keyword heuristics — they catch wrong events and keyword soup in the tested cases but do not prove
+entailment.
+
+## Re-scored runs
+
+| Run | Prompt / model | HTTP | Latency | v3 status | v3 automatic | Earlier score (retired) |
+|---|---|---|---|---|---|---|
+| baseline 1 | v1 / 70B | 504 | 25.1 s | **failed** (HTTP) | — | not scored |
+| baseline 2 | v1 / 70B | 200 | 30.1 s | **failed** | 33/63 | 20/24 → 22/45 |
+| baseline 3 | v1 / 70B | 200 | 30.6 s | **failed** | 33/63 | 20/24 |
+| tuning A | v2 / 70B | 200 | 35.4 s | **failed** | 44/65 | 30/45 |
+| tuning B | v2 / Gemma 4 | 504 | 55.1 s | **failed** (HTTP) | — | — |
+| tuning C (offer) | v2 / 70B | 200 | 31.3 s | **failed** | 68/72 | 51/53 |
+| tuning D | v2 / 70B | 200 | 30.7 s | **failed** | 44/65 | 30/45 |
+
+Totals differ from earlier versions because v3 adds checks (metadata, coverage, contradiction,
+event, latency, the contract end date, net on budget/rejected amounts). Counts are per document and
+not an accuracy percentage. Manual dimensions are `unreviewed` for every run; no run can become
+`accepted` because automatic checks already fail.
+
+What changed in the verdicts:
+
+- **Tuning C (synthetic offer):** previously 51/53; v3 additionally fails the 2026-08-12 date (its
+  context says "wizja lokalna", but the source date belongs to the rejected variant B quote) and the
+  31.3 s latency. The manual evidence table flags the character "Ž" (from "paŽdziernika") for the
+  language-fidelity review.
+- **Tuning A/D (sample):** besides the known missing amounts and dates, v3 fails four qualifier
+  checks on the same entry (184 500 and 12 300 without "netto", 8 600 EUR without a yearly period,
+  890 USD without a monthly period) and the latency (35.4 s / 30.7 s).
+- **Baselines 2/3:** fail legal forms, gross/VAT amounts, all invoice/annex dates and the signing
+  date in the dates list, plus latency 30.1–30.6 s.
+- Grounding passed for every saved 200 response under the stricter currency-aware matching: no
+  invented or summed amounts and no invented dates were found automatically.
+
+While rescoring, the evaluator itself showed a false failure (the negation pattern matched the
+Polish preposition "na" in "zaliczka na wdrożenie"); fixed in `dc495b7` with a regression test
+before the final numbers above.
+
+## Manual review checklist (not performed — no human review yet)
+
+For any future candidate result, a reviewer records pass/fail per dimension in a review file bound
+to the result's SHA-256: (1) every summary sentence is supported by the cited pages; (2) every key
+point is supported and none contradicts an amount/date; (3) each amount/date context names the
+right fact (use the report's evidence table); (4) no corrupted characters or wrong-language words.
+The current 70B and Gemma results remain unaccepted regardless of corrected scoring.

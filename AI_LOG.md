@@ -161,3 +161,28 @@ Mistakes / issues found:
   once produced corrupted Polish characters on the offer; Gemma produced an overlong answer.
 - Claude's earlier assumption that latency would follow output length is not supported: ~30 s
   appeared for 622–917 output tokens and 1.8k–9.4k input tokens alike.
+
+## 2026-10-05 — Evaluator audit fixes (Claude Code, Opus, subscription; offline only)
+
+Prompt (human → Claude, verbatim): «Прочитай docs/REVIEW_EVALUATION.md и выполни Next Claude task.
+Сначала воспроизведи дефекты тестами, затем исправь оценщик. Повторно оцени сохранённые ответы без
+вызовов AI. Не считай непроверенный смысл резюме и контекстов успешной проверкой. Пока без
+chunking, новых живых запросов и публикации.»
+
+- Reproduced all six audit findings as failing tests against the evaluator Claude had written
+  (`amount_in_source` substring/decimal bugs, wrong date events, keyword-soup contexts, wrong file
+  name, unjudged nonsense summary). Output saved in `.local/live/eval-regressions-before-fix.txt`.
+- Rewrote the evaluator as v3 (`6ccc699`): bounded number/date parsing with currency association,
+  page+snippet evidence per expected fact (validated, nothing from page 11), qualifiers and events
+  judged on one entry, contradiction/negation checks, schema/metadata/coverage checks, manual
+  dimensions with an evidence table and SHA-256-bound review files, statuses and `--check` exit
+  codes (tested against a fake local server, no AI). Added a hand-written reference answer and a
+  labelled adversarial fixture. Offline rescoring tool (`aaadd61`).
+- Mistakes found on the way: the first event check let "Nieprawdziwa data rozpoczęcia
+  zatrudnienia" match "work start" (fixed by requiring all event groups); the parser counted a
+  zero-padded KRS number as an amount (identifiers skipped); while rescoring, the negation pattern
+  matched the Polish preposition "na" (`dc495b7`). The file-writing tool turned ` ` escapes
+  into literal NBSP characters in regexes (caught by ruff RUF001, restored as escapes). A
+  placeholder commit hash briefly appeared in the results doc before being corrected.
+- Re-scored all seven saved responses offline: every one is `failed`; no manual review was done,
+  so no summary or context meaning is counted as passed. No model calls, chunking or publication.
