@@ -81,7 +81,7 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
     async def analyze_document(request: Request) -> JSONResponse:
         started = time.monotonic()
         runtime = runtime_factory(request.scope)
-        fields: dict[str, Any] = {"event": "analyze"}
+        fields: dict[str, Any] = {"event": "analyze", "model": runtime.settings.ai_model}
         usage = ModelUsage()
         try:
             await _enforce_rate_limit(runtime, request.headers.get("cf-connecting-ip", "unknown"))

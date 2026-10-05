@@ -46,29 +46,41 @@ class AnalysisOutcome:
 class ModelUsage:
     """Counters for operational logs and quota measurement (never content).
 
-    Workers AI text-generation responses include ``usage`` token counts; they are summed over all
-    attempts, including a failed first attempt, so neuron consumption per analysis can be measured.
+    A call is counted as *started* before it is dispatched, so a timed-out or failed invocation is
+    still visible: the provider may have done (and billed) the work even though we stopped waiting.
+    *Completed* calls returned a response; token counts are summed only from completed calls whose
+    response reported ``usage``. Missing usage is "unknown", never zero consumption.
     """
 
-    calls: int = 0
+    started: int = 0
+    completed: int = 0
+    usage_reported: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
 
-    def record(self, raw: Any) -> None:
-        self.calls += 1
+    def start(self) -> None:
+        self.started += 1
+
+    def complete(self, raw: Any) -> None:
+        self.completed += 1
         usage = raw.get("usage") if isinstance(raw, dict) else None
         if not isinstance(usage, dict):
             return
-        for key in ("prompt_tokens", "completion_tokens"):
-            value = usage.get(key)
-            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
-                setattr(self, key, getattr(self, key) + value)
+        values = [usage.get(key) for key in ("prompt_tokens", "completion_tokens")]
+        if not all(isinstance(v, int) and not isinstance(v, bool) and v >= 0 for v in values):
+            return
+        self.usage_reported += 1
+        self.prompt_tokens += values[0]
+        self.completion_tokens += values[1]
 
-    def log_fields(self) -> dict[str, int]:
+    def log_fields(self) -> dict[str, int | bool]:
         return {
-            "modelCalls": self.calls,
-            "promptTokens": self.prompt_tokens,
-            "completionTokens": self.completion_tokens,
+            "modelCallsStarted": self.started,
+            "modelCallsCompleted": self.completed,
+            "usageReportedCalls": self.usage_reported,
+            "usageComplete": self.started == self.usage_reported,
+            "reportedPromptTokens": self.prompt_tokens,
+            "reportedCompletionTokens": self.completion_tokens,
         }
 
 
@@ -213,10 +225,11 @@ async def analyze(
         }
         raw_text = ""
         try:
+            usage.start()
             raw = await asyncio.wait_for(
                 ai.run(settings.ai_model, inputs), timeout=settings.ai_timeout_seconds
             )
-            usage.record(raw)
+            usage.complete(raw)
             payload = _parse_payload(raw)
             raw_text = json.dumps(payload, ensure_ascii=False)
             return AnalysisOutcome(build_result(payload, request), attempt)

@@ -381,13 +381,38 @@ class UsageAI(FakeAI):
         return {**result, "usage": {"prompt_tokens": 7000, "completion_tokens": 900}}
 
 
-def test_logs_model_calls_and_token_usage_across_retry(capsys):
+def last_log(capsys):
+    return json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+
+
+def test_logs_started_completed_calls_and_usage_across_retry(capsys):
     ai = UsageAI(valid_model_output(keyPoints=["x"]), valid_model_output())
     assert post(make_client(ai), make_request()).status_code == 200
-    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert line["modelCalls"] == 2
-    assert line["promptTokens"] == 14000
-    assert line["completionTokens"] == 1800
+    line = last_log(capsys)
+    assert line["model"] == "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    assert (line["modelCallsStarted"], line["modelCallsCompleted"]) == (2, 2)
+    assert (line["usageReportedCalls"], line["usageComplete"]) == (2, True)
+    assert (line["reportedPromptTokens"], line["reportedCompletionTokens"]) == (14000, 1800)
+
+
+def test_timeout_counts_a_started_call_with_unknown_usage(capsys):
+    slow = FakeAI(valid_model_output(), delay=1.5)
+    response = post(make_client(slow, env={"AI_TIMEOUT_SECONDS": "1"}), make_request())
+    assert response.status_code == 504
+    line = last_log(capsys)
+    assert (line["modelCallsStarted"], line["modelCallsCompleted"]) == (1, 0)
+    assert (line["usageReportedCalls"], line["usageComplete"]) == (0, False)
+    assert line["outcome"] == "AI_TIMEOUT"
+
+
+@pytest.mark.parametrize("kind", ["unavailable", "quota", "invalid_output"])
+def test_provider_failure_counts_started_but_not_completed(capsys, kind):
+    ai = FakeAI(AIProviderError(kind), AIProviderError(kind))
+    post(make_client(ai), make_request())
+    line = last_log(capsys)
+    expected_started = 2 if kind == "invalid_output" else 1  # only invalid output is retried
+    assert (line["modelCallsStarted"], line["modelCallsCompleted"]) == (expected_started, 0)
+    assert line["usageComplete"] is False
 
 
 def test_logs_usage_on_failure_and_ignores_malformed_usage(capsys):
@@ -398,15 +423,19 @@ def test_logs_usage_on_failure_and_ignores_malformed_usage(capsys):
 
     ai = BadUsageAI("not json", "still not json")
     assert post(make_client(ai), make_request()).status_code == 502
-    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    line = last_log(capsys)
     assert line == {
         "event": "analyze",
+        "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
         "pageCount": 2,
         "pagesWithoutText": 0,
         "textChars": line["textChars"],
-        "modelCalls": 2,
-        "promptTokens": 0,
-        "completionTokens": 0,
+        "modelCallsStarted": 2,
+        "modelCallsCompleted": 2,
+        "usageReportedCalls": 0,
+        "usageComplete": False,
+        "reportedPromptTokens": 0,
+        "reportedCompletionTokens": 0,
         "outcome": "AI_INVALID_OUTPUT",
         "status": 502,
         "ms": line["ms"],
