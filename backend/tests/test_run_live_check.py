@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from evaluation.checks import result_digest
+from evaluation.checks import EVALUATOR_VERSION, result_digest
 from test_evaluation import ADVERSARIAL, REFERENCE, review
 
 BACKEND = pathlib.Path(__file__).resolve().parents[1]
@@ -56,7 +56,7 @@ def test_check_exits_zero_only_when_accepted(fake_api, tmp_path):
     review_file.write_text(json.dumps(review(REFERENCE)))
     done = run(url, tmp_path, "--check", "--manual-review", str(review_file))
     assert done.returncode == 0, done.stdout + done.stderr
-    report = json.loads((tmp_path / "t" / "evaluation-v3.json").read_text())
+    report = json.loads((tmp_path / "t" / f"evaluation-{EVALUATOR_VERSION}.json").read_text())
     assert report["status"] == "accepted"
     assert report["manual"]["resultSha256"] == result_digest(REFERENCE)
 
@@ -82,7 +82,8 @@ def test_check_exits_one_on_http_error(fake_api, tmp_path):
     state["body"] = state["body"].encode()
     done = run(url, tmp_path, "--check")
     assert done.returncode == 1
-    assert json.loads((tmp_path / "t" / "evaluation-v3.json").read_text())["status"] == "failed"
+    report = tmp_path / "t" / f"evaluation-{EVALUATOR_VERSION}.json"
+    assert json.loads(report.read_text())["status"] == "failed"
 
 
 def test_check_exits_one_when_server_is_unreachable(tmp_path):

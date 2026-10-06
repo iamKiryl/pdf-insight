@@ -20,7 +20,7 @@ import time
 import urllib.error
 import urllib.request
 
-from evaluation.checks import EXIT_CODES, assess
+from evaluation.checks import EVALUATOR_VERSION, EXIT_CODES, assess
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = pathlib.Path(__file__).resolve().parent / "cases"
@@ -109,7 +109,8 @@ def main(argv: list[str] | None = None) -> int:
 
     report = assess(case, request, parse_result(status, payload), http_status=status,
                     latency_ms=elapsed_ms, manual_review=manual)  # fmt: skip
-    (out / "evaluation-v3.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
+    evaluation = json.dumps(report, ensure_ascii=False, indent=2)
+    (out / f"evaluation-{EVALUATOR_VERSION}.json").write_text(evaluation)
     summary = {k: report.get(k) for k in ("status", "reasons", "httpStatus", "latencyMs")}
     if report.get("automatic"):
         summary["automatic"] = {
