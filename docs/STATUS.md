@@ -1,14 +1,14 @@
-# Current snapshot — 2026-10-06, 12:05 Warsaw (TS backend deployed)
+# Current snapshot — 2026-10-06, 12:20 Warsaw (CPU check)
 
-Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 40 min left).
+Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 24 min left).
 
 | Item | State |
 |---|---|
-| Public demo | https://iamkiryl.github.io/pdf-insight/ — frontend from `54515a5` (CI run 37445769851) |
-| Backend | **TypeScript Worker** `pdf-insight-api`, version `dd6a5db2-5c7d-4b1f-b037-b8608459087e`, application code `191a1d8`; exact rollback target Python `a4695cc8-ac6c-47a9-9253-6facf931c2b9` (docs/RUNTIME.md) |
-| Public sample analysis (run P) | **succeeded**: upload-to-render 26.5 s (< 30 s), 1 model call, 9 894 / 764 tokens, eval-v6 71/71, AI-assisted source review pass (status accepted), page-11 warning, export identical, history reopen with 0 requests |
-| Worker CPU (Cloudflare, `wrangler tail`) | health 0–1 ms, invalid full-size request 5 ms, analysis **37 ms** (vs Python 6–18 / 16–49 / 303 ms); above the documented Free 10 ms per request, no resource-limit errors |
-| Checks | frontend 107, backend 444, worker 103 tests; CI green |
+| Public demo | https://iamkiryl.github.io/pdf-insight/ — frontend from `54515a5` |
+| Backend | TypeScript Worker `pdf-insight-api`, version `d7e5ae75-a043-45c7-8f7f-2ecac09e9d74` (app code `17593aa`); rollback targets: TS `dd6a5db2-5c7d-4b1f-b037-b8608459087e`, Python `a4695cc8-ac6c-47a9-9253-6facf931c2b9` |
+| Public sample analyses on TS | P (`dd6a5db2`): 26.5 s, CPU 37 ms, accepted. **Q (`d7e5ae75`): 30.7 s upload-to-render — over the 30 s target**, CPU 39 ms, 70/71 (only latency failed), AI review pass |
+| Analysis CPU vs Free 10 ms | **not met**: 37 ms and 39 ms observed (both the first analysis after a deploy); non-AI requests 0–5 ms; no resource-limit errors |
+| Checks | worker 169 tests (89 parity + 66 phrase-equivalence + 14 behaviour), backend 444, frontend 107 |
 
 Requirements (IDs as in docs/PLAN.md):
 
@@ -16,14 +16,43 @@ Requirements (IDs as in docs/PLAN.md):
 |---|---|---|---|
 | F-01 | Drag & drop / chooser, PDF ≤ 10 MB | yes | yes |
 | F-02 | Text layer extraction, pages without text | yes | yes |
-| F-03 | 3–5 sentence factual summary in the document language | yes | yes for public run P (one success; run L timed out on the Python runtime) |
-| F-04 | Strict schema, one retry on invalid output | yes (TS deployed, parity with Python) | yes for run P (valid on the first call; correction path tested offline) |
-| F-05 | Readable result, JSON view and .json download | yes | yes (export identical to preview) |
+| F-03 | 3–5 sentence factual summary | yes | content yes in P and Q (AI review); timing passed in P, failed in Q |
+| F-04 | Strict schema, one retry on invalid output | yes | yes (valid first call in P and Q; correction path tested offline) |
+| F-05 | Readable result, JSON view and download | yes | yes |
 | F-06 | Empty, loading, error and retry states | yes | yes |
-| F-07 | Public GitHub Pages demo | yes | **conditionally**: one public success within 30 s; reliability not established (latency 25–26 s, one earlier 40 s timeout) and CPU 37 ms above the documented Free limit |
-| F-08 | Long documents (SHOULD) | **no** (compact rejects > 30 000 characters) | no |
+| F-07 | Public GitHub Pages demo | yes | **not reliably**: 1 of 2 public TS analyses under 30 s (26.5 s, 30.7 s); model latency dominates (25.8 / 30.2 s per call); CPU above the documented Free limit |
+| F-08 | Long documents (SHOULD) | **no** | no |
 | F-09 | Local history (SHOULD) | yes | yes |
 | F-10 | OCR (COULD) | **no** | no |
+
+## CPU check (docs/NEXT_CPU_CHECK.md)
+
+CDP CPU profiles of local workerd (wrangler dev inspector; fake AI returning a run-P-shaped
+provider response with usage; fresh isolate for each "first" request; 50 µs sampling):
+
+| Local workerd, sample request | first request, non-idle CPU | GC in first request | warm, per request |
+|---|---|---|---|
+| before (`dd6a5db2` code), run 1 / 2 | 23.6 / 20.2 ms | 24.4 / 0.7 ms (first value an outlier) | 4.80 / 4.97 ms |
+| after (`17593aa`), run 1 / 2 | 15.6 / 15.0 ms | 0.8 / 0.8 ms | 4.93 / 4.93 ms |
+
+Hotspots: cold request — `unattestedPeople` (a lookbehind `\p{L}` regex compiled per name and run
+over all pages, ≈ 3.6 ms) and duplicate character counting; warm — spread over date/number
+parsing, `pySplit`, `countLetters` (no single hotspot). Fix `17593aa`: literal whole-phrase search
+with the same boundary rule (66 equivalence cases) and one count per request; parity unchanged.
+
+Production after deploying the fix (run Q, first analysis after deploy like P): **39 ms CPU**
+(P: 37 ms). The local cold-start gain is not visible in one production sample; the remaining
+production CPU is not explained by the measured local cost (≈ 15–25 ms cold, ≈ 5 ms warm) — the
+difference may come from isolate start, JIT state, binding (de)serialisation of the 25 KB prompt
+and response, or machine speed; not established. The fix is behaviour-identical and stays
+deployed. Operational risk: each analysis exceeds the documented 10 ms; Cloudflare tolerates
+occasional overruns, sustained overuse may be enforced. No further optimisation or rewrite was
+started (timebox).
+
+Measurement correction: runs P and Q were driven through a headless Chrome instance left over
+from run L (same scratch profile, no logins) instead of a fresh profile — still an anonymous
+visitor, but run P's history entry was present in Q (history count 2). Timing and server
+measurements are unaffected. The leftover processes were closed after Q.
 
 ## TS deployment checkpoint (docs/REVIEW_TS_DEPLOY.md)
 

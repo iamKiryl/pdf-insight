@@ -660,3 +660,13 @@ identical to the preview; history reopen after reload made 0 API requests; 360 p
 horizontal scroll. Evidence: `.local/live/deployed/P-ts-public-sample/` (numeric tail summary,
 exported result, evaluation, review; raw tail kept local only). The same document took 26.1 s (J),
 ≈ 25 s (K) and timed out once at 40 s (L, Python runtime): latency is model-bound and variable.
+
+# CPU check — 2026-10-06 (docs/NEXT_CPU_CHECK.md)
+
+| Run | Where | Calls (observed) | Result |
+|---|---|---|---|
+| Q — sample contract | public demo → TS Worker `d7e5ae75` (CPU fix `17593aa`) | 1 started, 1 completed; 9 894 / 763 tokens | 200; **upload-to-render 30.7 s** (read 0.41 s, analysis 30.3 s); Worker wall 30.2 s, model call 30.2 s, **CPU 39 ms**; eval-v6 **70/71 — latency failed**; AI-assisted review (Claude) pass on content; contexts byte-identical to P; export identical; reopen 0 requests |
+
+Status: **failed** (latency over 30 s), quality unchanged. Not repeated (one analysis per
+checkpoint). Correction: runs P and Q used a headless Chrome left over from run L (anonymous
+scratch profile, not fresh); measurements unaffected. Evidence: `.local/live/deployed/Q-ts-cpu-fix/`.

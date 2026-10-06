@@ -9,10 +9,10 @@ organizations, people, amounts, dates, keywords) as validated JSON you can downl
 
 ## Public demo
 
-Status: published; the public analysis of the 12-page sample on the TypeScript backend succeeded
-once in 26.5 s (all automatic checks, AI-assisted review pass). Not a reliability guarantee: model
-latency is 25–26 s (one earlier 40 s timeout) and the analysis used 37 ms Worker CPU, above the
-documented Workers Free 10 ms (details: [docs/STATUS.md](docs/STATUS.md)).
+Status: published, not reliably within target. Two public analyses of the 12-page sample on the
+TypeScript backend gave correct results (AI-assisted review pass) in 26.5 s and 30.7 s; the model
+call alone takes 25–30 s (one earlier 40 s timeout). Each analysis used 37–39 ms Worker CPU, above
+the documented Workers Free 10 ms (details: [docs/STATUS.md](docs/STATUS.md)).
 
 - **Demo:** https://iamkiryl.github.io/pdf-insight/ (intended to stay available for 14 days, until
   2026-10-20; availability is not certified in advance)
@@ -39,8 +39,8 @@ accent, numbered monospace labels), Polish UI, four-step indicator driven by the
 
 ## Backend runtimes
 
-- `worker/` — compact-mode TypeScript Worker, **deployed** (version `dd6a5db2`): same API and
-  contract as Python, parity on all golden cases; Cloudflare CPU 0–1 ms health, 37 ms analysis.
+- `worker/` — compact-mode TypeScript Worker, **deployed** (version `d7e5ae75`): same API and
+  contract as Python, parity on all golden cases; Cloudflare CPU 0–1 ms health, 37–39 ms analysis.
 - `backend/` — Python Worker (FastAPI/Pydantic on Pyodide): previous production runtime, kept as
   reference implementation and evaluation tooling (evaluator, oracle, parity fixtures).
 - Deploy and exact rollback: [docs/RUNTIME.md](docs/RUNTIME.md).
@@ -155,7 +155,7 @@ is automated later).
 - Latency: the 12-page sample took 25–26 s in three runs but the one public run timed out at the
   40 s model-call ceiling (AI_TIMEOUT); < 30 s is not guaranteed.
 - Worker CPU: the TypeScript runtime uses 0–5 ms for non-AI requests but 37 ms for one analysis,
-  above the 10 ms documented for Workers Free (tolerated occasionally; not certified).
+  and 39 ms in two analyses, above the 10 ms documented for Workers Free (not certified).
 - Long documents (F-08): text above 30 000 characters is rejected with an explicit message (no
   truncation); OCR (F-10) is not implemented.
 - No OCR (F-10): image-only pages are reported, not read.

@@ -506,3 +506,20 @@ Read d2d92fe and saved P evaluator/browser/numeric-tail artifacts. Confirmed rec
 success, not matched workloads. Prepared NEXT_CPU_CHECK.md for bounded offline CPU profiling,
 small parity-preserving fixes only, and at most one additional quota-bounded public analysis.
 No model call or deployment by Codex.
+
+## 2026-10-06 — CPU check of the TS runtime (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/NEXT_CPU_CHECK.md. Найди CPU-затраты локальным
+профилированием. Вноси только измеримые исправления с сохранением parity. Затем — один
+контрольный публичный анализ в указанном бюджете. Без ослабления проверок, платной
+инфраструктуры и перебора моделей.»
+
+- CDP CPU profiling of local workerd (the wrangler inspector rejected Node's built-in WebSocket
+  without an Origin header; used `ws` with Origin). Run-P-shaped fake provider response.
+- First "before" profile showed 24 ms GC; a repeat showed 0.7 ms — reported as an outlier, not
+  attributed to the fix. `17593aa`: literal name search + single character count (cold first
+  request 20–24 → 15 ms locally; warm unchanged); 66 equivalence cases; parity unchanged.
+- Deployed `d7e5ae75` (rollback `dd6a5db2` recorded). One public analysis Q: 30.7 s (over target,
+  model call 30.2 s), CPU 39 ms (no production gain observed), 70/71, review pass. Not repeated.
+- Found that runs P and Q reused a leftover headless Chrome from run L (Claude's script did not
+  ensure the old process had exited); recorded the correction and closed the processes.
