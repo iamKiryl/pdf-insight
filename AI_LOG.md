@@ -416,3 +416,12 @@ CPU 303 ms. Checked official Cloudflare CPU limits and an 8B model card; no infe
 Found that browserStorage's write probe disables readable history when storage is full. Prepared
 REVIEW_STABILITY.md for a targeted fix, CPU profiling and one bounded smaller-model experiment;
 no public model switch or second backend rewrite without reviewing the evidence.
+
+## 2026-10-06 — Partial stability checkpoint review (Codex)
+
+User: «claude закончил». Reviewed through 4cfb355. Frontend 107 tests/typecheck/lint pass; backend
+Ruff passes, pytest 435 pass and five local-socket fixture setup errors from sandbox permissions.
+Compared saved candidate outputs: byte-identical. Read before/after workerd estimates and deployed
+M CPU summaries. No saved 8B live evidence found; model registration alone does not verify it.
+Appended a follow-up to REVIEW_STABILITY.md to finish the existing task without duplicate calls.
+No AI calls or deployment by Codex.

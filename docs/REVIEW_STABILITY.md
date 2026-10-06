@@ -75,3 +75,23 @@ Report commits, tests, CPU breakdown, model verdict and the exact proposed next 
 remaining architectural blocker. No further public sample retries in this checkpoint, no quota
 reset assumptions, no paid upgrade. F-08 long documents and F-10 OCR remain queued and incomplete;
 this review does not cancel those goals.
+
+## Follow-up review of 4cfb355 — 2026-10-06
+
+Codex reviewed the four implementation commits after this task. History quota handling and failed
+write/delete state are improved; 107 frontend tests, typecheck and lint passed independently.
+Ruff lint/format passed; backend pytest: 435 passed, five fixture setup errors because this review
+sandbox denies binding a localhost socket (`test_run_live_check.py`), not failed application
+assertions. Saved candidate output before/after memoisation is byte-identical for the sample.
+
+Saved local workerd profiling reports pipeline iteration estimates 41.6 → 23.5 ms and extraction
+38.1 → 20.3 ms. These are client wall-time estimates of repeated work, not production CPU metrics.
+Saved deployed M health/invalid-body requests report 16–49 ms CPU. The optimization is promising,
+but the evidence does not resolve Free compatibility or justify a public model switch.
+
+This checkpoint is incomplete in the repository: 8B has been added to MODEL_PROFILES, but no 8B
+live result/evaluation was found and STATUS/AI_LOG still describe the previous checkpoint. Finish
+steps 3–5 above. If a live experiment already happened outside these files, recover its evidence
+and record it; DO NOT duplicate calls. If it never ran, use only the original remaining four-call
+budget after checking current quota. Report a blocked experiment explicitly rather than implying
+it passed. Keep current deployment unchanged. Do not repeat completed profiling/history work.
