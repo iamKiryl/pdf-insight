@@ -3,6 +3,7 @@ import { formatBytes, formatSeconds } from '../lib/format';
 import type { UserMessage } from '../lib/messages';
 import type { ExtractedDocument } from '../lib/pdf';
 import type { Readiness } from '../lib/request';
+import { OcrWarning } from './OcrPanels';
 import { PartialWarning } from './PartialWarning';
 
 export function ReadingStatus(props: {
@@ -39,6 +40,8 @@ export function ReadyPanel(props: {
   readiness: Readiness;
   onAnalyze: () => void;
   onReset: () => void;
+  /** Offered when scanned pages remain and OCR has not been applied yet. */
+  onOcr: (() => void) | null;
 }) {
   const { doc, readiness } = props;
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -67,6 +70,7 @@ export function ReadyPanel(props: {
           <dd>{readiness.totalChars.toLocaleString('pl-PL')}</dd>
         </div>
       </dl>
+      {doc.ocrPages && doc.ocrPages.length > 0 && <OcrWarning pages={doc.ocrPages} before />}
       {doc.pagesWithoutText.length > 0 && (
         <PartialWarning pages={doc.pagesWithoutText} total={doc.pageCount} before />
       )}
@@ -79,6 +83,11 @@ export function ReadyPanel(props: {
         >
           Analizuj z AI
         </button>
+        {props.onOcr && (
+          <button type="button" className="button" onClick={props.onOcr}>
+            Rozpoznaj tekst ze skanów (OCR)
+          </button>
+        )}
         <button type="button" className="button" onClick={props.onReset}>
           Wybierz inny plik
         </button>
@@ -125,6 +134,7 @@ export function ErrorPanel(props: {
   message: UserMessage;
   onRetry: (() => void) | null;
   onReset: () => void;
+  onOcr?: (() => void) | null;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => headingRef.current?.focus(), [props.message]);
@@ -141,6 +151,11 @@ export function ErrorPanel(props: {
         {props.onRetry && (
           <button type="button" className="button button--primary" onClick={props.onRetry}>
             Spróbuj ponownie
+          </button>
+        )}
+        {props.onOcr && (
+          <button type="button" className="button button--primary" onClick={props.onOcr}>
+            Rozpoznaj tekst ze skanów (OCR)
           </button>
         )}
         <button type="button" className="button" onClick={props.onReset}>

@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiClientError, type analyzeDocument } from '../api/client';
 import { acceptedResult } from '../test/fixtures';
+import { OcrError, type OcrPageResult, type recognizePages } from './ocr';
 import type { ExtractedDocument, extractPdf } from './pdf';
 import { AnalysisResultSchema, type AnalysisResult } from './schema';
 import { useAnalysisFlow } from './useAnalysisFlow';
@@ -132,5 +133,135 @@ describe('useAnalysisFlow', () => {
     await act(() => result.current.selectFile(huge));
     expect(result.current.state.phase).toBe('error');
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('optional browser OCR in the flow', () => {
+  const source = new Blob(['%PDF-1.7']);
+  const scanned: ExtractedDocument = { ...extracted, source };
+  const ocrResult: OcrPageResult[] = [
+    { page: 2, text: 'Aneks nr 1. Kwota 5 000,00 zł netto.', confidence: 90, status: 'recognized' },
+  ];
+
+  async function scannedHook(recognize: typeof recognizePages, doc = scanned) {
+    const analyze = vi.fn<typeof analyzeDocument>();
+    const hook = renderHook(() =>
+      useAnalysisFlow({ analyze, extract: () => Promise.resolve(doc), recognize }),
+    );
+    await act(() => hook.result.current.selectFile(pdfFile));
+    return { ...hook, analyze };
+  }
+
+  it('runs only on explicit action, shows the text for review and never calls the model', async () => {
+    const recognize = vi.fn<typeof recognizePages>().mockResolvedValue(ocrResult);
+    const { result, analyze } = await scannedHook(recognize);
+    expect(result.current.state.phase).toBe('ready');
+    expect(recognize).not.toHaveBeenCalled();
+    await act(() => result.current.startOcr());
+    expect(recognize.mock.calls[0]?.[1]).toEqual([2]);
+    const review = result.current.state;
+    expect(review.phase).toBe('ocr-review');
+    if (review.phase !== 'ocr-review') return;
+    expect(review.merged.ocrPages).toEqual([2]);
+    expect(review.readiness.request.ocrPages).toEqual([2]);
+    act(() => {
+      result.current.acceptOcr();
+    });
+    const ready = result.current.state;
+    expect(ready.phase === 'ready' && ready.readiness.request.pagesWithoutText).toEqual([]);
+    expect(analyze).not.toHaveBeenCalled();
+  });
+
+  it('discarding keeps the original partial document unchanged', async () => {
+    const recognize = vi.fn<typeof recognizePages>().mockResolvedValue(ocrResult);
+    const { result } = await scannedHook(recognize);
+    await act(() => result.current.startOcr());
+    act(() => {
+      result.current.discardOcr();
+    });
+    const state = result.current.state;
+    expect(state.phase === 'ready' && state.readiness.request).toEqual({
+      fileName: 'umowa.pdf',
+      pageCount: 2,
+      pages: extracted.pages,
+      pagesWithoutText: [2],
+    });
+  });
+
+  it('a cancelled run is aborted and its late result never attaches (also after a new file)', async () => {
+    const late = deferred<OcrPageResult[]>();
+    const recognize = vi.fn<typeof recognizePages>().mockReturnValue(late.promise);
+    const { result } = await scannedHook(recognize);
+    act(() => {
+      void result.current.startOcr();
+    });
+    expect(result.current.state.phase).toBe('recognizing');
+    const signal = recognize.mock.calls[0]![2];
+    act(() => {
+      result.current.cancel();
+    });
+    expect(signal.aborted).toBe(true);
+    expect(result.current.state.phase).toBe('ready');
+    await act(() => result.current.selectFile(pdfFile));
+    await act(async () => {
+      late.resolve(ocrResult);
+      await Promise.resolve();
+    });
+    const state = result.current.state;
+    expect(state.phase === 'ready' && state.doc.ocrPages).toBeUndefined();
+  });
+
+  it('a failure shows a useful message with retry and a way back without OCR', async () => {
+    const recognize = vi
+      .fn<typeof recognizePages>()
+      .mockRejectedValueOnce(new OcrError('load-failed'))
+      .mockResolvedValueOnce(ocrResult);
+    const { result } = await scannedHook(recognize);
+    await act(() => result.current.startOcr());
+    const failed = result.current.state;
+    expect(failed.phase === 'recognizing' && failed.problem?.title).toBe(
+      'Nie udało się uruchomić OCR',
+    );
+    await act(() => result.current.startOcr());
+    expect(result.current.state.phase).toBe('ocr-review');
+  });
+
+  it('an unreadable page stays flagged and cannot be accepted alone', async () => {
+    const recognize = vi
+      .fn<typeof recognizePages>()
+      .mockResolvedValue([{ page: 2, text: '|', confidence: 12, status: 'unreadable' }]);
+    const { result } = await scannedHook(recognize);
+    await act(() => result.current.startOcr());
+    act(() => {
+      result.current.acceptOcr();
+    });
+    const state = result.current.state;
+    expect(state.phase).toBe('ocr-review');
+    expect(state.phase === 'ocr-review' && state.merged.pagesWithoutText).toEqual([2]);
+  });
+
+  it('a fully scanned PDF gets the OCR option on the no-text error', async () => {
+    const allScanned: ExtractedDocument = {
+      ...scanned,
+      pageCount: 1,
+      pages: [{ page: 1, text: '' }],
+      pagesWithoutText: [1],
+    };
+    const text = 'Aneks nr 1 do umowy. Wynagrodzenie netto wynosi 48 750,00 zł. '.repeat(5);
+    const recognize = vi
+      .fn<typeof recognizePages>()
+      .mockResolvedValue([{ page: 1, text, confidence: 95, status: 'recognized' }]);
+    const { result } = await scannedHook(recognize, allScanned);
+    const error = result.current.state;
+    expect(error.phase === 'error' && error.ocr).toBeTruthy();
+    await act(() => result.current.startOcr());
+    act(() => {
+      result.current.acceptOcr();
+    });
+    const ready = result.current.state;
+    expect(ready.phase === 'ready' && ready.readiness.request.ocrPages).toEqual([1]);
+    act(() => {
+      result.current.discardOcr();
+    });
   });
 });

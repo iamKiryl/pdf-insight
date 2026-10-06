@@ -23,3 +23,6 @@ backend/tools/workerd_profile/pdf_insight/
 # TS worker build output
 worker/dist/
 worker/.wrangler/
+
+# OCR assets copied from node_modules at dev/build time (scripts/copy-ocr-assets.mjs)
+frontend/public/ocr/

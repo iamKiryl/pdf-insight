@@ -9,6 +9,10 @@ export interface ExtractedDocument {
   pageCount: number;
   pages: PageText[];
   pagesWithoutText: number[];
+  /** Pages whose text the user accepted from browser OCR (absent: no OCR text in the document). */
+  ocrPages?: number[];
+  /** The chosen file, kept in browser memory only so OCR can render its scanned pages. */
+  source?: Blob;
 }
 
 export type FileProblem = 'not-pdf' | 'too-large' | 'empty';
@@ -41,7 +45,7 @@ type PdfJs = typeof import('pdfjs-dist');
 let pdfjsPromise: Promise<PdfJs> | undefined;
 
 /** pdf.js is loaded lazily; the worker URL is emitted by Vite with the correct /<repo>/ base. */
-async function loadPdfJs(): Promise<PdfJs> {
+export async function loadPdfJs(): Promise<PdfJs> {
   pdfjsPromise ??= Promise.all([
     import('pdfjs-dist'),
     import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
@@ -99,6 +103,7 @@ export async function extractPdf(
     return {
       fileName: file.name,
       fileBytes: file.size,
+      source: file,
       pageCount: doc.numPages,
       pages,
       pagesWithoutText: pages.filter((p) => !hasLetter(p.text)).map((p) => p.page),

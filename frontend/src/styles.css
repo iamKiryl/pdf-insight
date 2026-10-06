@@ -855,3 +855,23 @@ td.context {
     transform: none;
   }
 }
+
+/* Browser OCR review */
+.ocr-page {
+  margin-top: 16px;
+}
+
+.ocr-page__text {
+  max-height: 18rem;
+  margin: 6px 0 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -1,3 +1,4 @@
+import { OCR_LIMITS } from './ocr';
 import type { ApiClientError } from '../api/client';
 import { LIMITS } from './contract';
 import type { FileProblem, PdfExtractionError } from './pdf';
@@ -80,8 +81,8 @@ export function readinessMessage(problem: ReadinessProblem): UserMessage {
         title: 'Brak tekstu do analizy',
         detail:
           'Ten PDF nie zawiera warstwy tekstowej — prawdopodobnie jest skanem lub zdjęciem. ' +
-          'Rozpoznawanie tekstu (OCR) nie jest jeszcze dostępne. Użyj PDF z zaznaczalnym tekstem ' +
-          '(np. wyeksportowanego z edytora) albo najpierw wykonaj OCR w innym narzędziu.',
+          'Możesz spróbować rozpoznać tekst (OCR) w przeglądarce albo użyć PDF z zaznaczalnym ' +
+          'tekstem (np. wyeksportowanego z edytora).',
         retryable: false,
       };
     case 'insufficient-content':
@@ -153,3 +154,41 @@ export const AI_NOTICE =
   'z niego tekst — trafia on do naszego serwera i modelu AI (Cloudflare Workers AI, ' +
   'Llama 3.3 70B). Nie zapisujemy dokumentu na serwerze. Nie przesyłaj dokumentów, których ' +
   'treści nie możesz udostępnić.';
+
+export function ocrMessage(
+  reason: 'too-many-pages' | 'load-failed' | 'timeout' | 'failed',
+): UserMessage {
+  switch (reason) {
+    case 'too-many-pages':
+      return {
+        title: 'Zbyt wiele stron do OCR',
+        detail: `Rozpoznawanie tekstu obejmuje najwyżej ${OCR_LIMITS.maxPages} zeskanowanych stron naraz.`,
+        retryable: false,
+      };
+    case 'load-failed':
+      return {
+        title: 'Nie udało się uruchomić OCR',
+        detail:
+          'Nie można było pobrać modułu rozpoznawania tekstu. Sprawdź połączenie i spróbuj ' +
+          'ponownie lub kontynuuj bez OCR.',
+        retryable: true,
+      };
+    case 'timeout':
+      return {
+        title: 'OCR trwał zbyt długo',
+        detail: `Rozpoznawanie jednej strony przekroczyło ${String(OCR_LIMITS.pageTimeoutMs / 1000)} s i zostało przerwane. Możesz kontynuować bez OCR.`,
+        retryable: true,
+      };
+    case 'failed':
+      return {
+        title: 'Nie udało się rozpoznać tekstu',
+        detail: 'Strony nie dało się odczytać jako obrazu. Możesz kontynuować bez OCR.',
+        retryable: true,
+      };
+  }
+}
+
+export const OCR_NOTICE =
+  'OCR działa wyłącznie w Twojej przeglądarce (Tesseract.js, języki polski i angielski); obrazy ' +
+  'stron nie są nigdzie wysyłane. Rozpoznany tekst może zawierać błędy — zwłaszcza w kwotach, ' +
+  'nazwiskach i datach. Sprawdź go przed użyciem; do analizy trafi tylko po Twojej akceptacji.';

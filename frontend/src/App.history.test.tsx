@@ -42,6 +42,28 @@ describe('App with local history', () => {
     expect(screen.getByRole('button', { name: 'Wybierz plik PDF' })).toBeTruthy();
   });
 
+  it('reopens OCR provenance from history next to older entries without it', () => {
+    const ocr = createEntry(
+      {
+        ...result,
+        document: { ...result.document, title: 'Umowa OCR' },
+        analysis: { complete: true, pagesWithoutText: [], titleFallback: false, ocrPages: [11] },
+      },
+      { fileBytes: 2048, durationMs: 21_000 },
+      new Date(Date.UTC(2026, 9, 6, 10)),
+    );
+    const old = createEntry(result, { fileBytes: 2048, durationMs: 21_000 }, new Date(2026, 1, 1));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify({ version: 1, entries: [ocr, old] }));
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Otwórz: Umowa OCR' }));
+    expect(
+      screen.getByText(/Treść strony 11 pochodziła z automatycznego rozpoznawania/u),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Analizuj inny dokument' }));
+    fireEvent.click(screen.getByRole('button', { name: `Otwórz: ${result.document.title}` }));
+    expect(screen.queryByText(/Tekst z OCR/u)).toBeNull();
+  });
+
   it('deletes one entry and clears all after confirmation', () => {
     stored('Umowa A', 'Umowa B', 'Umowa C');
     render(<App />);

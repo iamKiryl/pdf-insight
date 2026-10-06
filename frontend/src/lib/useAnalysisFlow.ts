@@ -3,13 +3,26 @@ import { ApiClientError, analyzeDocument } from '../api/client';
 import {
   apiErrorMessage,
   extractionMessage,
+  ocrMessage,
   fileProblemMessage,
   readinessMessage,
   type UserMessage,
 } from './messages';
+import { OcrError, applyOcr, recognizePages, type OcrPageResult } from './ocr';
 import { PdfExtractionError, checkFile, extractPdf, type ExtractedDocument } from './pdf';
 import { prepareRequest, type Readiness } from './request';
 import type { AnalysisResult } from './schema';
+
+/** Where OCR was offered: the ready panel (partial scan) or the no-text-layer error. */
+export type OcrOrigin =
+  | { phase: 'ready'; doc: ExtractedDocument; readiness: Readiness }
+  | {
+      phase: 'error';
+      stage: 'read';
+      message: UserMessage;
+      retry: null;
+      ocr: ExtractedDocument;
+    };
 
 export type FlowState =
   | { phase: 'idle' }
@@ -23,19 +36,40 @@ export type FlowState =
       stage: 'upload' | 'read' | 'analyze';
       message: UserMessage;
       retry: { doc: ExtractedDocument; readiness: Readiness } | null;
+      /** A text-less document that browser OCR may still recover. */
+      ocr?: ExtractedDocument;
+    }
+  | {
+      phase: 'recognizing';
+      origin: OcrOrigin;
+      done: number;
+      total: number;
+      page: number;
+      problem: UserMessage | null;
+    }
+  | {
+      phase: 'ocr-review';
+      origin: OcrOrigin;
+      results: OcrPageResult[];
+      merged: ExtractedDocument;
+      readiness: Readiness;
     };
 
 type Analyze = typeof analyzeDocument;
 type Extract = typeof extractPdf;
+type Recognize = typeof recognizePages;
 
 /**
  * Upload → extract → analyze flow. Every operation gets a run id and an AbortController; results
  * from an older run (after cancel, reset or a new file) are ignored, so a slow stale response can
  * never replace a newer state.
  */
-export function useAnalysisFlow(deps: { analyze?: Analyze; extract?: Extract } = {}) {
+export function useAnalysisFlow(
+  deps: { analyze?: Analyze; extract?: Extract; recognize?: Recognize } = {},
+) {
   const analyze = deps.analyze ?? analyzeDocument;
   const extract = deps.extract ?? extractPdf;
+  const recognize = deps.recognize ?? recognizePages;
   const [state, setState] = useState<FlowState>({ phase: 'idle' });
   const runId = useRef(0);
   const controller = useRef<AbortController | null>(null);
@@ -77,6 +111,7 @@ export function useAnalysisFlow(deps: { analyze?: Analyze; extract?: Extract } =
             stage: 'read',
             message: readinessMessage(readiness.problem),
             retry: null,
+            ...(readiness.problem === 'no-text-layer' && doc.source ? { ocr: doc } : {}),
           });
           return;
         }
@@ -117,6 +152,57 @@ export function useAnalysisFlow(deps: { analyze?: Analyze; extract?: Extract } =
     [analyze, startRun],
   );
 
+  /** Explicit user action: recognise the scanned pages. Nothing is sent anywhere afterwards. */
+  const startOcr = useCallback(async () => {
+    let origin: OcrOrigin;
+    if (state.phase === 'ready') origin = state;
+    else if (state.phase === 'recognizing' && state.problem) origin = state.origin;
+    else if (state.phase === 'error' && state.ocr)
+      origin = { ...state, stage: 'read', retry: null, ocr: state.ocr };
+    else return;
+    const doc = origin.phase === 'ready' ? origin.doc : origin.ocr;
+    if (!doc.source || doc.pagesWithoutText.length === 0) return;
+    const run = startRun();
+    const pages = doc.pagesWithoutText;
+    const base = { phase: 'recognizing', origin, total: pages.length, problem: null } as const;
+    setState({ ...base, done: 0, page: pages[0] ?? 0 });
+    try {
+      const results = await recognize(doc.source, pages, run.signal, (done, total, page) => {
+        if (run.isCurrent()) setState({ ...base, total, done, page });
+      });
+      if (!run.isCurrent()) return;
+      const merged = applyOcr(doc, results);
+      setState({
+        phase: 'ocr-review',
+        origin,
+        results,
+        merged,
+        readiness: prepareRequest(merged),
+      });
+    } catch (error) {
+      if (!run.isCurrent()) return;
+      const reason = error instanceof OcrError ? error.reason : 'failed';
+      if (reason === 'cancelled') return;
+      setState({ ...base, done: 0, page: 0, problem: ocrMessage(reason) });
+    }
+  }, [recognize, startRun, state]);
+
+  /** The user accepts the reviewed OCR text: back to "ready", now with OCR pages marked. */
+  const acceptOcr = useCallback(() => {
+    if (state.phase !== 'ocr-review' || state.readiness.problem || !state.merged.ocrPages?.length)
+      return;
+    startRun();
+    setState({ phase: 'ready', doc: state.merged, readiness: state.readiness });
+  }, [startRun, state]);
+
+  /** Leave OCR (cancel, failure or rejected text): the previous panel, unchanged. */
+  const discardOcr = useCallback(() => {
+    startRun(); // terminates a running OCR and ignores its result
+    setState((current) =>
+      current.phase === 'recognizing' || current.phase === 'ocr-review' ? current.origin : current,
+    );
+  }, [startRun]);
+
   const start = useCallback(() => {
     if (state.phase === 'ready') void runAnalysis(state.doc, state.readiness);
     else if (state.phase === 'error' && state.retry)
@@ -125,11 +211,12 @@ export function useAnalysisFlow(deps: { analyze?: Analyze; extract?: Extract } =
 
   const cancel = useCallback(() => {
     startRun(); // aborts the in-flight request and invalidates its result
-    setState((current) =>
-      current.phase === 'analyzing'
-        ? { phase: 'ready', doc: current.doc, readiness: current.readiness }
-        : { phase: 'idle' },
-    );
+    setState((current) => {
+      if (current.phase === 'analyzing')
+        return { phase: 'ready', doc: current.doc, readiness: current.readiness };
+      if (current.phase === 'recognizing' || current.phase === 'ocr-review') return current.origin;
+      return { phase: 'idle' };
+    });
   }, [startRun]);
 
   const reset = useCallback(() => {
@@ -137,5 +224,5 @@ export function useAnalysisFlow(deps: { analyze?: Analyze; extract?: Extract } =
     setState({ phase: 'idle' });
   }, [startRun]);
 
-  return { state, selectFile, start, cancel, reset };
+  return { state, selectFile, start, cancel, reset, startOcr, acceptOcr, discardOcr };
 }

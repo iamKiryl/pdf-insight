@@ -22,6 +22,8 @@ export function prepareRequest(doc: ExtractedDocument): Readiness {
     pageCount: doc.pageCount,
     pages: doc.pages,
     pagesWithoutText: doc.pagesWithoutText,
+    // Only when the user accepted OCR text: the text-only payload stays exactly as before.
+    ...(doc.ocrPages?.length ? { ocrPages: doc.ocrPages } : {}),
   };
   const totalChars = doc.pages.reduce((sum, page) => sum + page.text.length, 0);
   const bodyBytes = new TextEncoder().encode(JSON.stringify(request)).length;

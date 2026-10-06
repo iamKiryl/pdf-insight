@@ -27,6 +27,10 @@ function position(state: FlowState): { index: number; status: StepStatus } {
       return { index: 1, status: 'active' };
     case 'ready':
       return { index: 2, status: 'waiting' };
+    case 'recognizing':
+      return { index: 1, status: state.problem ? 'error' : 'active' };
+    case 'ocr-review':
+      return { index: 1, status: 'waiting' };
     case 'analyzing':
       return { index: 2, status: 'active' };
     case 'done':

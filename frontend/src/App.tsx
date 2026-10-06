@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FileDropzone } from './components/FileDropzone';
 import { FlowSteps } from './components/FlowSteps';
 import { HistoryPanel } from './components/HistoryPanel';
+import { OcrReview, RecognizingStatus } from './components/OcrPanels';
 import { ResultView } from './components/ResultView';
 import { AnalyzingStatus, ErrorPanel, ReadingStatus, ReadyPanel } from './components/StatusPanels';
 import { finishedSteps, flowSteps } from './lib/flowSteps';
@@ -12,7 +13,8 @@ import { useAnalysisFlow } from './lib/useAnalysisFlow';
 import { useHistory, type HistoryStorageOption } from './lib/useHistory';
 
 export function App({ historyStorage }: { historyStorage?: HistoryStorageOption } = {}) {
-  const { state, selectFile, start, cancel, reset } = useAnalysisFlow();
+  const { state, selectFile, start, cancel, reset, startOcr, acceptOcr, discardOcr } =
+    useAnalysisFlow();
   const history = useHistory(historyStorage);
   const [opened, setOpened] = useState<HistoryEntry | null>(null);
   const saved = useRef<AnalysisResult | null>(null);
@@ -95,6 +97,33 @@ export function App({ historyStorage }: { historyStorage?: HistoryStorageOption 
             readiness={state.readiness}
             onAnalyze={start}
             onReset={reset}
+            onOcr={
+              state.doc.pagesWithoutText.length > 0 && state.doc.source && !state.doc.ocrPages
+                ? () => void startOcr()
+                : null
+            }
+          />
+        )}
+        {!opened && state.phase === 'recognizing' && (
+          <RecognizingStatus
+            fileName={
+              state.origin.phase === 'ready' ? state.origin.doc.fileName : state.origin.ocr.fileName
+            }
+            done={state.done}
+            total={state.total}
+            page={state.page}
+            problem={state.problem}
+            onCancel={discardOcr}
+            onRetry={() => void startOcr()}
+          />
+        )}
+        {!opened && state.phase === 'ocr-review' && (
+          <OcrReview
+            results={state.results}
+            readiness={state.readiness}
+            recovered={state.merged.ocrPages ?? []}
+            onAccept={acceptOcr}
+            onDiscard={discardOcr}
           />
         )}
         {!opened && state.phase === 'analyzing' && (
@@ -109,6 +138,7 @@ export function App({ historyStorage }: { historyStorage?: HistoryStorageOption 
             message={state.message}
             onRetry={state.retry ? start : null}
             onReset={reset}
+            onOcr={state.ocr ? () => void startOcr() : null}
           />
         )}
         {!opened && state.phase === 'done' && (

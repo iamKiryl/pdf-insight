@@ -9,6 +9,7 @@ import {
 } from '../lib/format';
 import { DOCUMENT_TYPE_LABELS } from '../lib/messages';
 import type { AnalysisResult } from '../lib/schema';
+import { OcrWarning } from './OcrPanels';
 import { PartialWarning } from './PartialWarning';
 
 interface Props {
@@ -53,6 +54,11 @@ export function ResultView({ result, durationMs, onReset, savedAt, savedToHistor
           {savedAt ? ' · otwarto z historii, bez ponownej analizy' : ''}
           {savedToHistory ? ' · zapisano w historii na tym urządzeniu' : ''}
         </p>
+        {analysis?.ocrPages && (
+          <div lang="pl">
+            <OcrWarning pages={analysis.ocrPages} />
+          </div>
+        )}
         {analysis && !analysis.complete && (
           <div lang="pl">
             <PartialWarning pages={analysis.pagesWithoutText} total={doc.pages} />
