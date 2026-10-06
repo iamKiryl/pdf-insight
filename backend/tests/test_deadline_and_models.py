@@ -176,12 +176,3 @@ def test_full_analysis_with_openai_style_model(capsys):
 
 def test_every_profiled_model_has_a_known_style():
     assert {p.style for p in MODEL_PROFILES.values()} <= {"workers", "openai"}
-
-
-def test_llama_8b_experiment_uses_the_workers_json_schema_style():
-    inputs = build_inputs(
-        profile_for("@cf/meta/llama-3.1-8b-instruct-fp8"), [{"role": "user", "content": "x"}],
-        {"a": 1}, 2048,
-    )  # fmt: skip
-    assert inputs["response_format"] == {"type": "json_schema", "json_schema": {"a": 1}}
-    assert output_content({"response": {"ok": True}}) == {"ok": True}

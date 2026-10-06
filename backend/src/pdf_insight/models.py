@@ -24,9 +24,6 @@ class ModelProfile:
 
 MODEL_PROFILES: dict[str, ModelProfile] = {
     "@cf/meta/llama-3.3-70b-instruct-fp8-fast": ModelProfile("workers"),
-    # Experiment candidate (catalog checked 2026-10-06: 32 000-token context, response_format
-    # json_schema, {"response": ...} output). Not the deployed model.
-    "@cf/meta/llama-3.1-8b-instruct-fp8": ModelProfile("workers"),
     # Reasoning is on by default for Gemma 4; extraction does not need it and it adds latency.
     "@cf/google/gemma-4-26b-a4b-it": ModelProfile(
         "openai", {"chat_template_kwargs": {"enable_thinking": False}}
