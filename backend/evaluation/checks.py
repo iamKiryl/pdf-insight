@@ -24,6 +24,7 @@ Summary, key points, the full meaning of contexts and language fidelity are repo
 import hashlib
 import json
 import re
+import unicodedata
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -32,7 +33,7 @@ from pydantic import ValidationError
 from evaluation.sources import amounts_on_page, as_decimal, dates_on_page
 from pdf_insight.contract import AnalysisResult
 
-EVALUATOR_VERSION = "eval-v4-2026-10-06"
+EVALUATOR_VERSION = "eval-v5-2026-10-06"
 LATENCY_LIMIT_MS = 30_000  # the brief's target; a local measurement never certifies deployment
 
 # Qualifier vocabulary (Polish + English stems).
@@ -323,6 +324,18 @@ def evaluate(
     ]  # fmt: skip
     add("grounding", "every amount occurs in the source with the same currency", not ungrounded,
         ", ".join(ungrounded))  # fmt: skip
+
+    def nfc(text: str) -> str:
+        return " ".join(unicodedata.normalize("NFC", text).casefold().split())
+
+    source_words = nfc(" ".join(p["text"] for p in request["pages"]))
+    unattested = [
+        person for person in result["entities"]["people"]
+        if not re.search(r"(?<!\w)" + " ".join(map(re.escape, nfc(person).split())) + r"(?!\w)",
+                         source_words)
+    ]  # fmt: skip
+    add("grounding", "every person name is written in the source as given", not unattested,
+        " | ".join(unattested))  # fmt: skip
     ungrounded_dates = [d["date"] for d in result["dates"] if d["date"] not in source_dates]
     if doc.get("date") and doc["date"] not in source_dates:
         ungrounded_dates.append(f"document.date {doc['date']}")

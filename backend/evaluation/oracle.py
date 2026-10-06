@@ -76,7 +76,7 @@ def run(case_id: str) -> tuple[bool, dict]:
         "amountIds": [c.id for c in amounts], "dateIds": [c.id for c in dates],
     }  # fmt: skip
     by_id = {c.id: c for c in candidates}
-    result = assemble(model, parse_selection(payload, by_id)).model_dump(mode="json")
+    result = assemble(model, parse_selection(payload, by_id, model)).model_dump(mode="json")
     checks = evaluate(expect, request, result)
     failed = [c for c in checks if not c.ok and not c.manual]
     report = {

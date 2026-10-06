@@ -161,3 +161,13 @@ def test_manual_route_does_not_hide_a_missing_date():
                     latency_ms=1000)  # fmt: skip
     assert report["status"] == "failed"
     assert any("date present: 2026-09-04" in f["name"] for f in report["automatic"]["failed"])
+
+
+def test_person_name_mixed_from_two_inflections_is_ungrounded():
+    result = reference()
+    result["entities"]["people"] = ["Joanna Wróbla"]  # not written in the offer
+    names = {c.name for c in evaluate(OFFER["expect"], REQUEST, result) if not c.ok}
+    assert "every person name is written in the source as given" in names
+    result["entities"]["people"] = ["Joanna Wróbel"]
+    names = {c.name for c in evaluate(OFFER["expect"], REQUEST, result) if not c.ok}
+    assert "every person name is written in the source as given" not in names
