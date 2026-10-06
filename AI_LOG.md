@@ -407,3 +407,12 @@ Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_PUBLIC_DEMO.md
   (AI_TIMEOUT, 40 s) — recorded, not retried. `wrangler tail` gave the first CPU numbers (303 ms
   for that request). The first script crashed after the timeout while saving a non-existent export;
   nothing was re-sent. History reopen verified with the earlier deployed result as local data.
+
+## 2026-10-06 — Public demo stability review (Codex)
+
+User: «claude закончил». Reviewed 08ff026; opened public Pages initial/history screen. Independently
+ran frontend 102 tests, typecheck and lint (pass). Read saved L summary: public analysis timed out,
+CPU 303 ms. Checked official Cloudflare CPU limits and an 8B model card; no inference performed.
+Found that browserStorage's write probe disables readable history when storage is full. Prepared
+REVIEW_STABILITY.md for a targeted fix, CPU profiling and one bounded smaller-model experiment;
+no public model switch or second backend rewrite without reviewing the evidence.
