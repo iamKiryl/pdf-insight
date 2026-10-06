@@ -63,7 +63,7 @@ def test_table_row_context_includes_its_column_header():
     header = "Lp. Nazwa Ilość Wartość netto VAT Wartość brutto"
     page = f"Waluta: PLN\n{header}\n1 Zaliczka wg 1 55 350,00 23% 12 730,50 68 080,50"
     first = next(c for c in extract_candidates(request_for([page])) if c.kind == "amount")
-    assert first.context.startswith(f"s. 1: {header} | 1 Zaliczka")
+    assert first.context.startswith(f"s. 1: [{header}] 1 Zaliczka wg 1 »55 350,00« 23%")
 
 
 def test_table_values_without_any_currency_are_not_candidates():
@@ -75,7 +75,7 @@ def test_label_line_context_includes_the_section_heading():
     page = "FAKTURA ZALICZKOWA nr 7\nNabywca: Alfa\nTermin płatności: 29.03.2026\nUwagi: brak"
     date = next(c for c in extract_candidates(request_for([page])) if c.kind == "date")
     assert date.date == "2026-03-29"
-    assert date.context == "s. 1: FAKTURA ZALICZKOWA nr 7 | Termin płatności: 29.03.2026"
+    assert date.context == "s. 1: [FAKTURA ZALICZKOWA nr 7] Termin płatności: »29.03.2026«"
 
 
 def test_prose_context_spans_pdf_line_breaks_and_keeps_the_qualifier():
@@ -257,12 +257,13 @@ def test_compact_mode_end_to_end_with_one_call(capsys):
     response = post(ai)
     assert response.status_code == 200
     assert len(ai.calls) == 1
-    assert [a["value"] for a in response.json()["amounts"]] == [10000.0] * 3
+    # the page repeats one sentence three times: the identical marked context is one fact
+    assert [a["value"] for a in response.json()["amounts"]] == [10000.0]
     lines = [json.loads(x) for x in capsys.readouterr().out.strip().splitlines()]
     call = next(x for x in lines if x["event"] == "model_call")
     assert (call["label"], call["outcome"]) == ("compact", "ok")
     summary = lines[-1]
-    assert (summary["mode"], summary["promptVersion"]) == ("compact", "compact-v1-2026-10-06")
+    assert (summary["mode"], summary["promptVersion"]) == ("compact", "compact-v2-2026-10-06")
 
 
 def test_invalid_ids_are_corrected_once_then_fail():

@@ -14,6 +14,14 @@ Supported numbers: 184 500,00 (space/NBSP/narrow-space groups, comma decimals), 
 groups, comma decimals required), 184,500.00 (comma groups), 1234,5 / 12.34 (plain decimals),
 plain integers. Supported dates: 2026-03-12, 12.03.2026, 12 marca 2026, 12 March 2026,
 March 12, 2026. Anything else is out of scope and simply not matched.
+
+PDF line wraps inside a space-grouped number ("295\n200,00 zł"): the prefix (1-3 digit groups at
+the end of a line) and the suffix (a line starting with a 3-digit group) are reconstructed as ONE
+token with the original offsets only when the prefix line is a full prose line (a wrap happens
+at the right margin: at least WRAP_MIN_LINE characters and WRAP_MIN_WORDS words) and the prefix is
+not a reference number ("Strona 4 z 12", "nr 7", "§ 3").
+Otherwise the wrap is ambiguous (separate table cells or rows, page numbers) and neither part is
+emitted — never the suffix alone. Digit-newline-digit is not replaced globally.
 """
 
 import datetime as dt
@@ -38,7 +46,19 @@ _NUMBER = re.compile(
     """,
     re.VERBOSE,
 )
-_CURRENCY_AFTER = re.compile(r"^[ \u00a0]*(zł|złotych|PLN|EUR|euro|€|USD|\$|[A-Z]{3})(?![\w])")
+_WRAP = re.compile(
+    r"(?<![\d.,])(?P<prefix>\d{1,3}(?:[ \u00a0\u202f]\d{3})*)[ \t]*\n[ \t]*"
+    r"(?P<suffix>\d{3}(?:[ \u00a0\u202f]\d{3})*(?:,\d{1,2})?)(?![\d]|[.,]\d|[ \u00a0]?%)"
+)
+_REFERENCE_BEFORE = re.compile(
+    r"(?:\b(?:strona|str|s|z|nr|no|page|of|pkt|ust|art|poz|lp)\.?|§)\s*$", re.IGNORECASE
+)
+WRAP_MIN_WORDS = 3
+WRAP_MIN_LINE = 60  # characters; narrow columns are left ambiguous (rejected)
+# A currency marker may follow after one PDF line break ("184 500,00\nzł netto").
+_CURRENCY_AFTER = re.compile(
+    r"^[ \u00a0]*(?:\n[ \u00a0]*)?(zł|złotych|PLN|EUR|euro|€|USD|\$|[A-Z]{3})(?![\w])"
+)
 _CURRENCY_BEFORE = re.compile(r"(PLN|EUR|€|USD|\$|[A-Z]{3})[ \u00a0]*$")
 _PAGE_CURRENCY = re.compile(r"\b(?:Waluta|Currency)\s*:\s*([A-Z]{3})\b")
 _ALIASES = {"zł": "PLN", "złotych": "PLN", "euro": "EUR", "€": "EUR", "$": "USD"}
@@ -93,15 +113,34 @@ def _currency(code: str) -> str | None:
     return code if code in CURRENCIES else None
 
 
+def _wraps(text: str) -> tuple[list[tuple[int, int, str]], set[int]]:
+    """Line-wrapped grouped numbers: (start, end, normalised text) to reconstruct, and the start
+    offsets of every number part that must not be emitted on its own."""
+    joined, hidden = [], set()
+    for match in _WRAP.finditer(text):
+        hidden |= {match.start("prefix"), match.start("suffix")}
+        line_start = text.rfind("\n", 0, match.start("prefix")) + 1
+        before = text[line_start : match.start("prefix")]
+        words = sum(1 for w in before.split() if any(ch.isalpha() for ch in w))
+        full_line = match.end("prefix") - line_start >= WRAP_MIN_LINE
+        if full_line and words >= WRAP_MIN_WORDS and not _REFERENCE_BEFORE.search(before):
+            number = f"{match.group('prefix')} {match.group('suffix')}"
+            joined.append((match.start("prefix"), match.end("suffix"), number))
+    return joined, hidden
+
+
 def amounts_on_page(page: int, text: str) -> list[AmountToken]:
     declared = _PAGE_CURRENCY.search(text)
     page_currency = _currency(declared.group(1)) if declared else None
+    joined, hidden = _wraps(text)
+    spans = [(m.start("num"), m.end("num"), m.group("num")) for m in _NUMBER.finditer(text)
+             if m.start("num") not in hidden]  # fmt: skip
     tokens = []
-    for match in _NUMBER.finditer(text):
-        if re.match(r"0\d", match.group("num")):
+    for start, end, number in sorted(spans + joined):
+        if re.match(r"0\d", number):
             continue  # identifiers such as KRS 0000990114 are not amounts
-        after = _CURRENCY_AFTER.match(text[match.end() : match.end() + 12])
-        before = _CURRENCY_BEFORE.search(text[max(0, match.start() - 6) : match.start()])
+        after = _CURRENCY_AFTER.match(text[end : end + 12])
+        before = _CURRENCY_BEFORE.search(text[max(0, start - 6) : start])
         currency = None
         if after:
             currency = _currency(after.group(1))
@@ -110,11 +149,11 @@ def amounts_on_page(page: int, text: str) -> list[AmountToken]:
         tokens.append(
             AmountToken(
                 page,
-                parse_number(match.group("num")),
+                parse_number(number),
                 currency or page_currency,
-                match.group("num"),
-                match.start("num"),
-                match.end("num"),
+                number,
+                start,
+                end,
                 currency is not None,
             )
         )
