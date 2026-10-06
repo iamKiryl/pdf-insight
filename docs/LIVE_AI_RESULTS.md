@@ -592,9 +592,23 @@ analysis through the real frontend passed. Model calls: 3 of the 6 allowed.**
 |---|---|---|---|---|---|---|
 | I — synthetic offer | local `pywrangler dev` | 1 | 11.5 s (call 11.45 s) | 1 820 / 410 | 74/74 | accepted: 4-sentence factual summary, 3 distinct key points, no markers, injection excluded, exact selection (11 amounts, 6 dates) |
 | J — sample contract | local `pywrangler dev` | 1 | 26.2 s (call 26.14 s) | 9 894 / 736 | 71/71 | accepted: factual summary; key points restate it (editorial); 8 people exactly as in the source ("Marek Zieliński"); selection verbose (76/77 amounts) |
-| K — sample contract | deployed Worker, real local frontend | 1 (inferred) | upload-to-render 25.3 s | not read | 71/71 | accepted: budget and term in the summary, "120 users" key point, 9 people as in the source |
+| K — sample contract | deployed Worker, real local frontend | not observed | upload-to-render 25.3 s | not read | 71/71 | accepted: budget and term in the summary, "120 users" key point, 9 people as in the source |
 
 Prompt `compact-v4-2026-10-06`. Evidence: `.local/live/tuning/I-compact-v4-offer/`,
 `.local/live/tuning/J-compact-v4-sample/`, `.local/live/deployed/K-deployed-sample/`. Own
 accounting for 2026-10-06 UTC ≈ 1 750 neurons; actual usage unknown. The sample's 26.2 s / 25.3 s
 leave little margin under 30 s. Deployment details: docs/DEPLOYMENT.md.
+
+# Public demo checkpoint — 2026-10-06 (docs/REVIEW_PUBLIC_DEMO.md)
+
+Correction to the release checkpoint: run K's provider-call count was not observed (it had been
+inferred from timing); the checkpoint had two observed local analyses (I, J) plus one deployed
+analysis with an unobserved call count.
+
+| Run | Where | Calls (observed) | Result |
+|---|---|---|---|
+| L — sample contract | public demo → Worker `a4695cc8` | 1 started, 0 completed (`wrangler tail`) | **AI_TIMEOUT** after 40 000 ms, HTTP 504, Worker CPU 303 ms; no result to evaluate |
+
+The same document took 26.1 s (J) and ≈ 25 s (K) earlier the same morning; per-call latency of
+the 70B model varies enough to cross the 40 s ceiling. One run, not retried. Evidence:
+`.local/live/deployed/L-public-sample/summary.json`.

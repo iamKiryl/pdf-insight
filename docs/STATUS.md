@@ -1,14 +1,34 @@
-# Current snapshot — 2026-10-06
+# Current snapshot — 2026-10-06 (public demo checkpoint)
 
-Backend deployed in compact mode; public Pages frontend is still pending. Claude reports accepted
-live runs I/J/K, including 25.3 s upload-to-render with the deployed backend. Codex independently
-verified health, CORS and production 429 without model calls. CPU consumption remains unobserved.
-F-08, F-09 and F-10 remain open. Next task: docs/REVIEW_PUBLIC_DEMO.md.
+| Item | State |
+|---|---|
+| Public demo | https://iamkiryl.github.io/pdf-insight/ — built from `85112f8` by CI run https://github.com/iamKiryl/pdf-insight/actions/runs/37428051869 (all five jobs passed) |
+| Repository | https://github.com/iamKiryl/pdf-insight (public, full history) |
+| Backend | https://pdf-insight-api.pdf-insight-api.workers.dev, Worker version `a4695cc8` built from `c775866` (no backend code change since), Workers Free, `AI_MODE=compact`, CORS `https://iamkiryl.github.io` |
+| Checks | frontend lint, format, typecheck, **102** Vitest tests, Pages build; backend Ruff and **439** pytest — locally and in CI |
+| Public live analysis (one allowed) | **failed: `AI_TIMEOUT`** — the single model call hit the 40 s ceiling (Worker wall 40.0 s, 504, clear Polish message with retry). Not retried by rule |
+| Earlier successful analyses | local I (offer 11.5 s), J (sample 26.2 s); deployed backend via local frontend K (25.3 s upload-to-render) — latency varies across runs; < 30 s is not guaranteed |
+| Worker CPU (observed with `wrangler tail`) | analyze request (timed out) **303 ms**, preflight 21 ms, health 6 ms. The Free plan documents 10 ms per request; the platform did not reject this request, but Free-plan CPU compatibility is **not verified** and is a release risk |
+| AI usage | own estimate ≈ 410 neurons per sample analysis; actual usage unknown |
+| Public UI checks (anonymous headless Chrome) | initial state, pdf.js worker (200), real file input upload, page-11 warning, non-PDF error, 360 px without horizontal scroll, history reopen from existing local data with **0 API requests**, JSON export identical to stored result |
 
-The sections below retain dated checkpoint history; their earlier deployment/verification claims
-refer to those checkpoints, not the current snapshot.
+| Requirement | State |
+|---|---|
+| F-01 – F-07 | implemented and tested (see history below for details) |
+| F-08 long documents | **open** — compact rejects > 30 000 characters with an explicit 413; `chunked` is an unvalidated experiment |
+| F-09 local history | **implemented** (`abe5a21`): ≤ 10 validated results + file metadata in localStorage, 1 000 000-char bound, corrupted/old entries skipped, unavailable/full storage reported, reopen without AI, delete one, clear all |
+| F-10 OCR | **open** — image-only pages produce the partial-analysis warning only |
 
-# Status — Stage 1 (executable vertical slice)
+Release risks: model latency near or above 30 s on the 12-page sample (one public timeout), CPU
+above the documented Free limit, production rate limits per location only, 14-day availability
+(intended until 2026-10-20; cannot be certified in advance).
+
+The sections below are dated checkpoint history; statements such as "nothing deployed" refer to
+their own dates, not to this snapshot.
+
+# History — dated checkpoints (oldest first)
+
+## Stage 1 status (2026-10-05, historical)
 
 Date: 2026-10-05. Implementer: Claude Code (Opus, subscription). Reviewer: Codex.
 Nothing has been deployed or published. "Tested" below means automated tests or local runs
@@ -240,7 +260,7 @@ reject verified without model calls. One deployed sample analysis through the re
 upload-to-render 25.3 s, 71/71, page-11 warning and JSON export verified. Calls this checkpoint:
 3 of 6 (2 local + 1 deployed, the last inferred from timing).
 
-## Release gates still open
+## Release gates as of the backend deployment (2026-10-06, superseded by the snapshot)
 
 | Gate | State |
 |---|---|
@@ -256,7 +276,7 @@ upload-to-render 25.3 s, 71/71, page-11 warning and JSON export verified. Calls 
 | F-09 local history | **not implemented** |
 | F-10 OCR | **not implemented** (partial-analysis warning only) |
 
-## Next steps (proposed)
+## Next steps proposed at that checkpoint (superseded)
 
 1. User reads Worker CPU time/logs in the Cloudflare dashboard; then the separately authorised
    publication step: public repository, `VITE_API_URL`, GitHub Pages deploy, live checks.

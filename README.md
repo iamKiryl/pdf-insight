@@ -7,15 +7,30 @@ organizations, people, amounts, dates, keywords) as validated JSON you can downl
 > run against live Workers AI, and the <30 s target is unmeasured. See
 > [docs/STATUS.md](docs/STATUS.md) for what is implemented, tested and pending.
 
+## Public demo
+
+- **Demo:** https://iamkiryl.github.io/pdf-insight/ (intended to stay available for 14 days, until
+  2026-10-20; availability is not certified in advance)
+- **Repository:** https://github.com/iamKiryl/pdf-insight
+- **Backend:** https://pdf-insight-api.pdf-insight-api.workers.dev (`/api/health`)
+
+![Public demo: a deployed analysis reopened from local history](docs/screenshots/public-demo-result-from-history.png)
+
+The screenshot shows the public demo with a real deployed analysis of the sample contract reopened
+from local history (no new AI request). More: [mobile](docs/screenshots/public-demo-mobile-result.png),
+[history panel](docs/screenshots/public-demo-history.png), [timeout handling](docs/screenshots/public-demo-timeout.png).
+Screenshots under `docs/screenshots/desktop-*.png` / `mobile-*.png` come from a local stub with a
+hand-made fixture (no AI).
+
+Usage: drop a PDF (≤ 10 MB, with a text layer), check the page/character summary and scan warning,
+click **Analizuj z AI**, read the report, download the JSON. Finished analyses are kept in **local
+history** on this device (≤ 10, results and file metadata only, never the PDF or its text) and can
+be reopened, deleted or cleared without contacting the server.
+
 ## Interface
 
 Dark interface in the visual language of the recruitment brief (near-black panels, one lime
 accent, numbered monospace labels), Polish UI, four-step indicator driven by the real flow state.
-Screenshots below come from a **local stub with a hand-made fixture** (no live AI, not an analysis
-result): [desktop](docs/screenshots/desktop-result.png), [mobile 360 px](docs/screenshots/mobile-result.png),
-[idle](docs/screenshots/desktop-idle.png), [ready with a scanned page](docs/screenshots/mobile-ready.png).
-
-![PDF Insight result view (local fixture)](docs/screenshots/desktop-result.png)
 
 ## Architecture
 
@@ -114,18 +129,22 @@ is automated later).
 
 ## Deployment
 
-Backend deployed on 2026-10-06 to the existing Cloudflare Workers Free account:
-**https://pdf-insight-api.pdf-insight-api.workers.dev** (`/api/health`), release mode
-`AI_MODE=compact`, CORS limited to `https://iamkiryl.github.io`. Details, verification and the
-remaining steps: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The frontend (GitHub Pages) is not
-published yet: create the public repository, set repository variable `VITE_API_URL` to the Worker
-URL, enable Pages with source "GitHub Actions" and run **Actions → CI → Run workflow** with
-`deploy` checked; then verify the live URL, pdf.js worker loading and take a screenshot.
+- Backend: Cloudflare Workers Free, `cd backend && uv run pywrangler deploy` (config in
+  `backend/wrangler.jsonc`: production, `AI_MODE=compact`, CORS `https://iamkiryl.github.io`, rate
+  limiting). No secrets: Workers AI is used through the binding.
+- Frontend: GitHub Actions workflow `CI` (lint → typecheck/tests + backend tests → build → Pages).
+  Repository variable `VITE_API_URL` = Worker URL; Pages source "GitHub Actions"; publishing runs
+  only from **Actions → CI → Run workflow** with `deploy` checked. Base path `/pdf-insight/`.
+- Details, verification evidence and remaining gates: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Current limitations
 
-- Backend deployed, frontend not yet published; Worker CPU time and production 429 not observed;
-  deployed upload-to-render measured once (25.3 s, local frontend → deployed Worker).
+- Latency: the 12-page sample took 25–26 s in three runs but the one public run timed out at the
+  40 s model-call ceiling (AI_TIMEOUT); < 30 s is not guaranteed.
+- Worker CPU: 303 ms observed for one analyze request, above the 10 ms documented for Workers Free;
+  not rejected by the platform, compatibility unverified.
+- Long documents (F-08): text above 30 000 characters is rejected with an explicit message (no
+  truncation); OCR (F-10) is not implemented.
 - No OCR (F-10): image-only pages are reported, not read.
 - Compact mode is an unaccepted experiment: the model selects nearly every candidate (verbose,
   repeated amounts) and its key points copied the summary in the live trial. Whitespace tables
@@ -135,7 +154,6 @@ URL, enable Pages with source "GitHub Actions" and run **Actions → CI → Run 
   provider responses, not with the real model. In the default single mode text over 48 000
   characters is rejected with a clear message; the request envelope is 64 000 characters. Nothing
   is truncated.
-- No local history (F-09).
 - Text extraction reads multi-column layouts row by row (good for tables, can interleave true
   columns such as side-by-side party details).
 - Rate limits are per Cloudflare location and approximate; the daily Workers AI allocation is not

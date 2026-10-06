@@ -386,3 +386,24 @@ client got edge 1010, curl reached the app. Exact five-request enforcement is no
 Prepared docs/REVIEW_PUBLIC_DEMO.md: bounded browser history, public repository/Pages via existing
 CI, one quota-bounded public sample analysis, CPU observations and current delivery documentation.
 Flagged inference of deployed provider-call count from elapsed time as insufficient evidence.
+
+## 2026-10-06 — Local history, publication and public demo (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_PUBLIC_DEMO.md полностью. Добавь локальную
+историю, опубликуй репозиторий и frontend через CI, проверь публичное демо. Соблюдай указанные
+ограничения расходов и вызовов AI. Запиши результаты и оставшиеся ограничения.»
+
+- `abe5a21` F-09 local history. Own mistakes caught by tests/lint before committing: writes inside a
+  React state updater (replaced by a small store + useSyncExternalStore); a helper exported from a
+  component file (react-refresh rule); an oversize newest entry made the size bound evict every
+  older entry (fixed: entries that alone exceed the bound are discarded first); a "quiet" button
+  border at 1.3:1 contrast (raised to 4.6:1).
+- Pre-publication audit of all commits (authors, secrets, local paths, binaries) — clean.
+- `85112f8`: `astral-sh/setup-uv@v10` does not exist as a tag; pinned to `v10.2.0` after checking
+  every action tag via the GitHub API. Repository created public, variable set, Pages enabled,
+  push run and dispatch run (deploy=true) all green.
+- Public demo: in-app browser could not fetch the test PDF from localhost (Private Network Access);
+  used headless Chrome with a real file input instead. The single allowed analysis timed out
+  (AI_TIMEOUT, 40 s) — recorded, not retried. `wrangler tail` gave the first CPU numbers (303 ms
+  for that request). The first script crashed after the timeout while saving a non-existent export;
+  nothing was re-sent. History reopen verified with the earlier deployed result as local data.
