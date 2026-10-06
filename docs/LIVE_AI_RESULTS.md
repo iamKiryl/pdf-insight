@@ -582,3 +582,19 @@ tests; oracle 70/70 and 73/73. Not verified live.
 ## Not done
 
 The repeated sample run (offer failed), compact release preparation, deployment.
+
+# Release checkpoint — 2026-10-06 (docs/REVIEW_RELEASE_CHECKPOINT.md)
+
+**Result: both cases passed on the current compact code; the backend was deployed and one deployed
+analysis through the real frontend passed. Model calls: 3 of the 6 allowed.**
+
+| Run | Where | Calls | Time | Tokens (in / out) | Evaluator v6 | AI-assisted review (Claude) |
+|---|---|---|---|---|---|---|
+| I — synthetic offer | local `pywrangler dev` | 1 | 11.5 s (call 11.45 s) | 1 820 / 410 | 74/74 | accepted: 4-sentence factual summary, 3 distinct key points, no markers, injection excluded, exact selection (11 amounts, 6 dates) |
+| J — sample contract | local `pywrangler dev` | 1 | 26.2 s (call 26.14 s) | 9 894 / 736 | 71/71 | accepted: factual summary; key points restate it (editorial); 8 people exactly as in the source ("Marek Zieliński"); selection verbose (76/77 amounts) |
+| K — sample contract | deployed Worker, real local frontend | 1 (inferred) | upload-to-render 25.3 s | not read | 71/71 | accepted: budget and term in the summary, "120 users" key point, 9 people as in the source |
+
+Prompt `compact-v4-2026-10-06`. Evidence: `.local/live/tuning/I-compact-v4-offer/`,
+`.local/live/tuning/J-compact-v4-sample/`, `.local/live/deployed/K-deployed-sample/`. Own
+accounting for 2026-10-06 UTC ≈ 1 750 neurons; actual usage unknown. The sample's 26.2 s / 25.3 s
+leave little margin under 30 s. Deployment details: docs/DEPLOYMENT.md.

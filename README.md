@@ -112,23 +112,20 @@ No secrets are required by the application. Deploying the Worker needs a Cloudfl
 developer machine (or a scoped `CLOUDFLARE_API_TOKEN` stored as a CI secret if backend deployment
 is automated later).
 
-## Deployment prerequisites (not done yet)
+## Deployment
 
-1. A human logs in to Cloudflare (`npx wrangler login`) and confirms the account is on the Free
-   plan with Workers AI available.
-2. Set `ALLOWED_ORIGINS` in `backend/wrangler.jsonc` to the GitHub Pages origin, then
-   `cd backend && uv run pywrangler deploy`. Check `GET /api/health` shows `aiBinding: true` and
-   `rateLimiter: true`.
-3. Measure CPU time per request (Workers Free allows 10 ms CPU per request; network wait for the AI
-   call does not count) and the end-to-end time on the sample contract and other PDFs.
-4. In GitHub: create the public repository, set repository variable `VITE_API_URL`, enable Pages
-   with source "GitHub Actions", then run **Actions → CI → Run workflow** with `deploy` checked.
-5. Verify the live URL `https://<user>.github.io/<repo>/` loads the pdf.js worker, analyses a PDF,
-   and record a screenshot.
+Backend deployed on 2026-10-06 to the existing Cloudflare Workers Free account:
+**https://pdf-insight-api.pdf-insight-api.workers.dev** (`/api/health`), release mode
+`AI_MODE=compact`, CORS limited to `https://iamkiryl.github.io`. Details, verification and the
+remaining steps: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The frontend (GitHub Pages) is not
+published yet: create the public repository, set repository variable `VITE_API_URL` to the Worker
+URL, enable Pages with source "GitHub Actions" and run **Actions → CI → Run workflow** with
+`deploy` checked; then verify the live URL, pdf.js worker loading and take a screenshot.
 
 ## Current limitations
 
-- Not deployed; no live AI verification, CPU/latency/quota measurements or public URL yet.
+- Backend deployed, frontend not yet published; Worker CPU time and production 429 not observed;
+  deployed upload-to-render measured once (25.3 s, local frontend → deployed Worker).
 - No OCR (F-10): image-only pages are reported, not read.
 - Compact mode is an unaccepted experiment: the model selects nearly every candidate (verbose,
   repeated amounts) and its key points copied the summary in the live trial. Whitespace tables

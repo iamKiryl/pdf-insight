@@ -356,3 +356,22 @@ Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_UI_AND_COMPACT
   omission). Stopped live calls (1 of 4 used); fixed offline (`e2c20c4`, `093f856`), replayed the
   saved text through the fix. Manual review by Claude (AI), not a human.
 - Run G's key-point verdict reinterpreted as editorial per the review; historical record kept.
+
+## 2026-10-06 — Release checkpoint and backend deployment (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_RELEASE_CHECKPOINT.md. Повтори оба документа
+на текущем compact. Если оба проходят качество и скорость — сразу переходи к деплою backend на
+существующем Cloudflare Free и проверке из реального frontend. Без новых моделей, платных
+подключений и переработки архитектуры. Общий предел — 6 вызовов модели, включая коррекции.
+Запиши URL, результаты и оставшиеся ограничения.»
+
+- Live runs I (offer) and J (sample) passed; reviews by Claude (AI). `c775866` promoted compact in
+  the deployment config with the Pages-only origin (GitHub login read via `gh`).
+- Checked that no Worker `pdf-insight-api` existed (`wrangler deployments list` → 10007) before
+  deploying; dry run, then deploy (version `fb88ede1`). Health and CORS verified with curl.
+- Temporary version with `http://localhost:5173` allowed (`--var`), local frontend pointed at the
+  Worker, sample dropped via a scripted DataTransfer: 25.3 s upload-to-render, 71/71. JSON export
+  captured by intercepting `URL.createObjectURL` (first attempt failed: the blob URL is revoked
+  immediately). Exported JSON saved to `.local` through a one-shot localhost receiver.
+- Redeployed the committed config (version `a4695cc8`); localhost now 403. Worker CPU time and the
+  deployed call count were not observable from the CLI; recorded as not observed.

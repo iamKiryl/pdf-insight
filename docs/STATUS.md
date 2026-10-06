@@ -219,36 +219,37 @@ summary and key points: language fidelity failed, so the sample was not repeated
 `e2c20c4` removes markers copied before their value and treats any other marker as invalid
 output; `093f856` (eval-v6) fails leaked markers. Not re-measured live yet.
 
+## Release checkpoint (docs/REVIEW_RELEASE_CHECKPOINT.md) — see docs/DEPLOYMENT.md
+
+Live on current compact (`compact-v4`): offer run I 11.5 s, 74/74; sample run J 26.2 s, 71/71;
+both accepted with AI-assisted source review (Claude). `c775866`: compact is the release mode in
+`wrangler.jsonc` / `.dev.vars.example`; `single` remains the code fallback, `chunked` an
+unvalidated experiment. Backend deployed to the Free account:
+https://pdf-insight-api.pdf-insight-api.workers.dev (version `a4695cc8`). Health, CORS allow /
+reject verified without model calls. One deployed sample analysis through the real frontend:
+upload-to-render 25.3 s, 71/71, page-11 warning and JSON export verified. Calls this checkpoint:
+3 of 6 (2 local + 1 deployed, the last inferred from timing).
+
 ## Release gates still open
 
-Measurements are local (`pywrangler dev`), never deployed.
-
-| Gate | Old single mode (default `AI_MODE=single`) | Current compact mode (experimental) |
-|---|---|---|
-| Latency < 30 s | 30.1–35.4 s per sample call — not met | sample 22.6 s / 23.8 s, offer 14.0 s (one call each) — met locally only |
-| Factual completeness | sample 44/65 (eval-v3) | sample 69/69 (eval-v4), offer 73/73 (eval-v5) automatic; manual: run G key points (editorial) and name defect, run H marker leak (fixed, not re-measured) |
-| Names and narrative fidelity | not systematically checked | name grounding + marker check now enforced; needs one clean live pass on each case |
-
-Open for both / delivery:
-- Re-run the offer and then the sample in compact mode (≤ 4 calls) after review of `e2c20c4`.
-- Deployed upload-to-render latency (< 30 s), Workers Free CPU per request (not measurable
-  locally), actual AI usage (≈ 410 neurons per sample analysis by own estimate; dashboard usage
-  unknown), CORS from the Pages origin, rate limiting on Cloudflare (bindings exist, 429 seen only
-  locally).
-- GitHub Pages live URL, refresh, pdf.js worker (`.mjs` MIME), screenshot, 14-day availability.
-- Model selects nearly every candidate on the long sample (verbose, repeated amounts); people
-  list incomplete on the sample (completeness limitation, separate from name fidelity).
-- Two-column lines and whitespace tables: values kept but ownership/column mapping left to the
-  reader.
-- Additional real PDFs (other languages/types).
-- F-08 remains open: compact passing does not implement long-document chunking; unvalidated `chunked` does not count. **F-09 local history
-  and F-10 OCR are not implemented.**
+| Gate | State |
+|---|---|
+| Latency < 30 s | compact: 11.5–26.2 s locally, 25.3 s deployed backend with local frontend — not yet on the public Pages URL; the sample has only ~5 s margin |
+| Free CPU per request | **not observed** (dashboard Metrics needed); no resource-limit error seen |
+| AI quota | ≈ 410 neurons per sample analysis (own estimate); actual usage unknown |
+| CORS | verified on the Worker (Pages origin allowed, others 403); requests without Origin are only rate limited |
+| Rate limiting | bindings deployed; production 429 not verified |
+| Frontend | GitHub Pages not published; live URL, pdf.js worker, screenshot, 14-day availability open |
+| Quality | long sample: model selects nearly every candidate (verbose); two-column/whitespace-table mapping left to the reader; people list completeness varies |
+| Old single mode | baseline only: 30.1–35.4 s locally, sample 44/65 (eval-v3) |
+| F-08 long documents | **open** — compact rejects > 30 000 characters (explicit 413); chunked unvalidated |
+| F-09 local history | **not implemented** |
+| F-10 OCR | **not implemented** (partial-analysis warning only) |
 
 ## Next steps (proposed)
 
-1. Codex review of `e2c20c4`/`093f856`; then the offer and the sample in compact mode
-   (≤ 4 calls). Only if both pass: compact as the proposed release mode, backend deployment and
-   live CPU/CORS/rate-limit/upload-to-render checks.
+1. User reads Worker CPU time/logs in the Cloudflare dashboard; then the separately authorised
+   publication step: public repository, `VITE_API_URL`, GitHub Pages deploy, live checks.
 2. Tune prompt/model only from measured failures; record in AI_LOG.md.
 3. GitHub repo + Pages deploy via manual workflow; README demo link and screenshot.
 4. SHOULD: F-08 chunking (page-based, merge + dedupe), F-09 local history. COULD: F-10 OCR for
