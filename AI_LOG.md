@@ -607,3 +607,10 @@ OCR-страниц при повторном распознавании, доб�
   without AI (probe now reaches INSUFFICIENT_CONTENT, 0 model calls); then Pages from `1b1ddd7`
   via CI dispatch; public OCR flow verified without AI. No AI call.
 
+
+## 2026-10-06 — OCR publication review and handoff scope (Codex)
+
+Reviewed c357017, repeated-pass provenance and correction cleanup; independently ran 136 frontend
+tests and typecheck (pass). README still depicts Python/chunked production and an old TS version.
+Prepared FINAL_HANDOFF_CHECK.md: predeclared OCR-aware oracle, one quota-bounded public OCR analysis,
+accurate README and delivery checklist. No email/form submission, no claim that F08 or CPU is solved.
