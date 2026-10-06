@@ -363,3 +363,77 @@ deadline, concurrency, token caps and the retry budget are unchanged. Comparison
 call on the same sample (prompt v2): single mode returned a valid result in 30.7–35.4 s (evaluator
 v3: failed on latency and missing facts); chunked mode returned no result within 40 s. The choice of
 the final approach is left to the architectural review.
+
+---
+
+# Compact candidate-selection trial — 2026-10-06 (docs/ADR_COMPACT_ANALYSIS.md)
+
+**Result: the sample returned a valid result in 22.6 s with one model call, but it FAILED the
+quality gate (evaluator v3: failed, 61/69 automatic; manual review: contexts fail). The synthetic
+offer was therefore not run. Model calls used: 1 of the 4 allowed.**
+
+## Setup
+
+| Item | Value |
+|---|---|
+| Code | `82bb960` (compact mode) after `1b929d6` (cancellation-race fix); prompt `compact-v1-2026-10-06` |
+| Mode | local `.dev.vars` override `AI_MODE=compact`, restored afterwards; committed default `single` |
+| Limits | unchanged: 55 s request budget, ≤ 40 s per call, one corrective retry, `max_tokens` 2048 |
+| Model / account | `@cf/meta/llama-3.3-70b-instruct-fp8-fast`, Workers Free without payment method; new UTC day (2026-10-06 04:33 UTC), actual usage not readable from the session — own accounting 0 neurons before the call |
+| Input | saved sample request (20 701 chars, page 11 without text): 126 candidates (76 amounts, 50 dates), prompt ≈ 25 200 chars |
+| Offline checks before calling | every expected amount/date of both fixtures is a candidate; an oracle selection (exactly the expected IDs) still fails 5 sample checks and 1 offer check (see Findings 3–4) |
+| Evidence | `.local/live/tuning/F-compact-sample/` (response, meta, evaluator report, worker log, AI manual review) |
+
+## Call
+
+| Label | Attempt | Outcome | Duration | Tokens (in / out) | Finish | Output bytes |
+|---|---|---|---|---|---|---|
+| compact | 1 | ok | 22 493 ms | 9 727 / 740 | stop | 1 554 |
+
+Server 22 540 ms, client round trip 22 575 ms (local; not deployed upload-to-result). ≈ 411 neurons.
+Throughput ≈ 33 output tokens/s for this call.
+
+## Evaluator v3 (automatic): failed, 61/69
+
+Passed: metadata, coverage, document type/language/date/title, **all 11 expected amounts and all
+7 expected dates (with their events)**, injection (no 1 PLN, no invalidity claim), grounding,
+latency < 30 s (local).
+
+Failed:
+- 3 × organisations — the model returned "Nordwave Logistics" / "Kwadrat Software" without legal
+  forms (model error).
+- 5 × "entry has no contradicting qualifier" (184 500, 226 935, 42 435, 12 300, 55 350): the
+  contexts are exact source sentences/table rows that state net, VAT and gross (or several periods)
+  for different amounts at once; the evaluator's exclusivity rule treats this as a contradiction.
+  The oracle selection fails the same 5 checks, so this is a structural mismatch between
+  source-quoted contexts and the evaluator heuristic — reported, not worked around.
+
+## Manual review against the source (by Claude, an AI — not a human review)
+
+| Dimension | Verdict | Specific findings |
+|---|---|---|
+| summary_factual | pass | 4 supported sentences (parties, CRM implementation, "co najmniej 25 wdrożeń" on p. 1, term 2026-04-01 – 2028-03-31); no financial terms; names without legal forms |
+| key_points_factual | pass (weak) | verbatim copies of the first three summary sentences; no amounts, dates or obligations |
+| contexts_meaning | **fail** | **wrong amount "200 PLN"**: a fragment of "295 200,00 zł" split by a PDF line break, which the candidate parser does not join (code defect); 9 repeated footer dates "Wersja 1.3 · 12.03.2026 Strona N z 12" selected as events although the prompt excludes footers; flattened multi-column penalty table gives unreadable contexts; table rows with several values do not say which column a value is |
+| language_fidelity | pass | correct Polish, no corrupted characters; one sentence ends with "r." contrary to the prompt |
+
+Selection behaviour: the model selected 75 of 76 amount candidates (only the injected 1 PLN was
+excluded) and all 50 date candidates — it did not discriminate beyond the injection. The result is
+complete but verbose (75 amounts, 50 dates, many repeated).
+
+## Findings
+
+1. **Latency improved**: one 22.6 s call (740 output tokens) versus 30.7–35.4 s single-call runs
+   and a 40 s chunked timeout — the only configuration so far under 30 s locally. Not a deployed
+   measurement.
+2. **Completeness/grounding by construction**: all expected facts present; no invented or
+   retyped values; the injected amount was excluded by the model in this run.
+3. **Quality gate not met**: one wrong amount (parser defect: numbers split across PDF lines), no
+   discrimination of footers/repeats, legal forms dropped, low-value key points.
+4. **Evaluator/context mismatch**: whole-sentence source contexts fail the exclusivity heuristic
+   for multi-amount sentences even with a perfect selection; the offer's "Warszawa, dnia 4 września
+   2026 r." line does not name its event, so the oracle fails that date check too.
+
+## Not done
+
+The synthetic offer (gate not met), any prompt/rule tuning, deployment.

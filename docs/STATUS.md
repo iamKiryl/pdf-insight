@@ -56,7 +56,7 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 ```
 backend$  uv run ruff check .            # All checks passed
 backend$  uv run ruff format --check .   # all files formatted
-backend$  uv run pytest -q               # 341 passed (337 after the chunking review fixes, 96 in Stage 1)
+backend$  uv run pytest -q               # 377 passed (341 before the compact checkpoint, 96 in Stage 1)
 backend$  uv lock --check                # lock up to date
 frontend$ npm run lint                   # 0 problems (--max-warnings=0)
 frontend$ npm run format:check           # all files formatted
@@ -180,6 +180,17 @@ per-call cap, chunk 2 and chunk 3 cancelled → `AI_TIMEOUT` (504) after 40.0 s,
 retry used. Throughput ≈ 20–29 output tokens/s, so per-call time follows output length and the
 evidence-rich chunk schema makes the densest chunk slower than the whole single call. New defect
 recorded: a queued call (chunk 3) was dispatched for 3 ms after the failure before cancellation.
+
+## Compact candidate-selection trial — see docs/LIVE_AI_RESULTS.md
+
+`1b929d6` fixed the cancellation race (terminal-failure latch; 3 of 5 new tests failed on the old
+code). `82bb960` added the opt-in `AI_MODE=compact`: code extracts candidate amounts/dates with
+exact offsets and source contexts, one model call selects IDs, values/contexts are copied from the
+source. One live sample run: 200 in 22.6 s, 1 call, 9 727 / 740 tokens (≈ 411 neurons); evaluator
+v3 failed 61/69 (legal forms dropped; 5 "contradicting qualifier" checks that also fail with a
+perfect selection because source sentences state net/VAT/gross together); manual review failed on
+contexts (wrong "200 PLN" from "295\n200,00" split across lines, 9 footer dates selected). Gate
+not met, so the synthetic offer was not run (1 of 4 calls used). Default remains single-call.
 
 ## Release gates still open
 

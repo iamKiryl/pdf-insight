@@ -269,3 +269,26 @@ Re-review of 06f389b в docs/REVIEW_CHUNKING.md. Один анализ тест�
   data point throughput is ~20–29 output tokens/s, so long, evidence-rich chunk answers are slow.
 - New defect found in Claude's orchestration: a queued call was dispatched (3 ms) after the failure
   released its semaphore slot. Recorded, not fixed (checkpoint scope).
+
+## 2026-10-06 — Compact candidate-selection checkpoint (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/ADR_COMPACT_ANALYSIS.md. Сначала исправь гонку
+отмены отдельным коммитом. Затем реализуй компактный режим: извлечение кандидатов кодом, выбор
+идентификаторов моделью, сборка фактов из исходных цитат. После тестов — один живой прогон
+договора. Только если качество и скорость проходят — прогон второго документа. Общий предел:
+4 вызова модели, включая коррекции. Без платных подключений и публикации. Обнови результаты и
+документацию. При неудаче остановись с точной причиной, не ослабляй критерии.»
+
+- `1b929d6`: terminal-failure latch for chunked mode; event-controlled tests (3 of 5 failed before).
+  One older test had only passed because queued calls were dispatched and then cancelled.
+- `82bb960`: compact mode. While probing contexts offline Claude found and fixed its own context
+  rules before any live call: PDF line breaks inside sentences had cut "odrzucono" from the 310 000
+  context; "tj. " ended sentences; prose lines with two amounts were treated as table rows; headers
+  were taken from prose fragments; "HARMONOGRAM I …" was not a heading. Two compact tests were wrong
+  (a table without currency, a limit test without AI binding) and were corrected.
+- Offline oracle check (no AI): with exactly the expected IDs selected, 5 sample checks and 1 offer
+  check still fail (source sentences state net/VAT/gross together; a date line names no event).
+- Live: one sample call, 200 in 22.6 s, evaluator failed 61/69, manual review (by Claude, labelled
+  as AI) failed contexts: a wrong "200 PLN" produced by Claude's candidate parser from
+  "295\n200,00" split across lines, footer dates selected, legal forms dropped. Stopped: the
+  synthetic offer was not run; nothing was tuned after the call.
