@@ -12,7 +12,7 @@ import pytest
 from conftest import ORIGIN, make_client
 from pdf_insight.analyzer import InvalidModelOutput
 from pdf_insight.candidates import MAX_CANDIDATES, extract_candidates
-from pdf_insight.compact import assemble, mark_document, parse_selection
+from pdf_insight.compact import COMPACT_PROMPT_VERSION, assemble, mark_document, parse_selection
 from pdf_insight.contract import AnalyzeRequest, has_letter
 
 EVAL = pathlib.Path(__file__).resolve().parents[1] / "evaluation"
@@ -263,7 +263,7 @@ def test_compact_mode_end_to_end_with_one_call(capsys):
     call = next(x for x in lines if x["event"] == "model_call")
     assert (call["label"], call["outcome"]) == ("compact", "ok")
     summary = lines[-1]
-    assert (summary["mode"], summary["promptVersion"]) == ("compact", "compact-v2-2026-10-06")
+    assert (summary["mode"], summary["promptVersion"]) == ("compact", COMPACT_PROMPT_VERSION)
 
 
 def test_invalid_ids_are_corrected_once_then_fail():

@@ -17,6 +17,7 @@ the response stay below the model's 24 000-token context.
 import json
 import re
 import time
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -46,7 +47,7 @@ from .models import build_inputs, profile_for
 from .prompt import correction_message, neutralize
 from .runtime import AIClient, AIProviderError
 
-COMPACT_PROMPT_VERSION = "compact-v2-2026-10-06"
+COMPACT_PROMPT_VERSION = "compact-v3-2026-10-06"
 COMPACT_MAX_CHARS = 30_000
 
 SYSTEM_PROMPT = """You analyse ONE document and return JSON that matches the schema. Rules:
@@ -82,8 +83,10 @@ complete sentences, each a DIFFERENT specific obligation or term (payments and a
 duration and termination, penalties, service levels, annexes); never repeat or paraphrase a \
 summary sentence. keywords: up to 5. organizations: every company or institution named as a party \
 or participant, each written exactly as in the document INCLUDING its legal form (for example \
-"sp. z o.o.", "S.A.") whenever the document gives one. people: natural persons named in the \
-document.
+"sp. z o.o.", "S.A.") whenever the document gives one. people: every natural person named in \
+the document, each copied EXACTLY as one occurrence in the text spells it (same letters and \
+word endings; do not convert grammatical cases, do not combine forms from different \
+occurrences).
 9. Use only facts stated in the document; never invent or calculate. If some pages had no \
 extractable text, do not claim the whole document was analysed.
 10. If there is not enough information for a factual summary and 3 key points, set \
@@ -178,9 +181,34 @@ class Selection:
     main_date: Candidate | None
 
 
-def parse_selection(payload: dict[str, Any], by_id: dict[int, Candidate]) -> Selection:
+def _normalized(text: str) -> str:
+    return " ".join(unicodedata.normalize("NFC", text).casefold().split())
+
+
+def unattested_people(names: list[str], request: AnalyzeRequest) -> list[str]:
+    """Person names that do not occur in the source as written. A name is attested when its words
+    appear consecutively as whole words in one page (Unicode NFC, case and whitespace — including
+    PDF line breaks — normalised). Any attested inflection is accepted ("Marka Zielińskiego");
+    a form combined from different occurrences ("Marek Zielińskiego") or an unrelated name is
+    not. No morphology is guessed and nothing is rewritten."""
+    pages = [_normalized(p.text) for p in request.pages]
+    missing = []
+    for name in names:
+        words = _normalized(name).split()
+        if not words:
+            continue
+        pattern = re.compile(r"(?<!\w)" + r" ".join(map(re.escape, words)) + r"(?!\w)")
+        if not any(pattern.search(page) for page in pages):
+            missing.append(name)
+    return missing
+
+
+def parse_selection(
+    payload: dict[str, Any], by_id: dict[int, Candidate], request: AnalyzeRequest | None = None
+) -> Selection:
     """Validate the narrative fields (same rules as the public contract) and every ID: it must
-    exist in this request's candidate map, have the right kind and appear only once."""
+    exist in this request's candidate map, have the right kind and appear only once. With the
+    request, every person name must also be attested in the source (see unattested_people)."""
     try:
         output = CompactOutput.model_validate(payload)
     except ValidationError as exc:
@@ -210,6 +238,14 @@ def parse_selection(payload: dict[str, Any], by_id: dict[int, Candidate]) -> Sel
             seen.add(candidate_id)
         return chosen
 
+    if request is not None:  # problems are logged: positions only, never the name itself
+        missing = set(unattested_people(output.people, request))
+        for position, name in enumerate(output.people):
+            if name in missing:
+                problems.append(
+                    f"people.{position}: not written in the document; copy the name exactly as "
+                    "one occurrence spells it, or leave it out"
+                )
     amounts = resolve("amountIds", output.amountIds, "amount")
     dates = resolve("dateIds", output.dateIds, "date")
     main = None
@@ -352,7 +388,7 @@ async def analyze_compact(
                 record["outputBytes"] = len(json.dumps(raw["response"], ensure_ascii=False))
             payload = _parse_payload(raw)
             raw_text = json.dumps(payload, ensure_ascii=False)
-            selection = parse_selection(payload, by_id)
+            selection = parse_selection(payload, by_id, request)
             if selection.output.insufficientContent:
                 done("insufficient_content")
                 raise ApiError("INSUFFICIENT_CONTENT")
