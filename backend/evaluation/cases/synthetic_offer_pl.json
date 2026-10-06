@@ -185,7 +185,9 @@
           [
             "ofert"
           ]
-        ]
+        ],
+        "eventReview": "manual",
+        "eventReviewNote": "The place-and-date header names no role; whether it is the issue date is judged in the contexts_meaning review, not by keyword."
       },
       {
         "date": "2026-10-31",

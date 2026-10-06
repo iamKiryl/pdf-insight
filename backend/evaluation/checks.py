@@ -4,9 +4,21 @@ Automatic checks are deliberately narrow and conservative. They establish *prese
 association* of expected facts (the right amount entry carries the stated qualifiers and no
 contradicting ones; the right date entry names the expected event) and *grounding* (every amount
 and date in the result occurs in the source as a bounded token with the same currency). They do
-NOT establish semantic entailment. Summary, key points, the full meaning of contexts and language
-fidelity are reported as ``needs_manual_review`` with an evidence table; an unchecked dimension is
-never counted as passed.
+NOT establish semantic entailment.
+
+Source-quote contexts (compact mode) mark the selected occurrence as »value«; a true sentence may
+state net, VAT and gross values together. For such a context, qualifiers are associated with the
+marked occurrence only: the text between the neighbouring value tokens (money or dates) or
+sentence ends around the marker, excluding a bracketed column header/heading, and the marked text
+must parse to the entry's own value. Contexts without exactly one marker keep the blanket rule
+(any contradicting qualifier anywhere in the context fails). A date-event subcheck that a case
+marks ``"eventReview": "manual"`` (e.g. an issue-date header such as "Warszawa, dnia …" that
+does not name its role) is reported as a manual subcheck when it does not match automatically:
+neither passed nor failed, it keeps the status at needs_manual_review until a contexts_meaning
+review of this exact result passes (or fails it). A missing date still fails.
+
+Summary, key points, the full meaning of contexts and language fidelity are reported as
+``needs_manual_review`` with an evidence table; an unchecked dimension is never counted as passed.
 """
 
 import hashlib
@@ -20,7 +32,7 @@ from pydantic import ValidationError
 from evaluation.sources import amounts_on_page, as_decimal, dates_on_page
 from pdf_insight.contract import AnalysisResult
 
-EVALUATOR_VERSION = "eval-v3-2026-10-05"
+EVALUATOR_VERSION = "eval-v4-2026-10-06"
 LATENCY_LIMIT_MS = 30_000  # the brief's target; a local measurement never certifies deployment
 
 # Qualifier vocabulary (Polish + English stems).
@@ -72,6 +84,58 @@ class Check:
     name: str
     ok: bool
     detail: str = ""
+    manual: bool = False  # a subcheck that needs the contexts_meaning review when it does not pass
+
+
+_MARKED = re.compile(r"»([^»«]+)«")
+_BRACKETED_PREFIX = re.compile(r"^s\. \d+: (?:\[[^\]]*\] )?")
+_SENTENCE_BREAK = re.compile(r"[.!?;]\s+(?=[A-ZĄĆĘŁŃÓŚŹŻ])")
+_TWO_DECIMALS = re.compile(r"[.,]\d{2}$")
+
+
+def _value_spans(text: str) -> list[tuple[int, int]]:
+    spans = [(t.start, t.end) for t in amounts_on_page(0, text)
+             if t.adjacent_currency or _TWO_DECIMALS.search(t.text)]  # fmt: skip
+    return spans + [(m.start(), m.end()) for m in _DATE_TOKEN.finditer(text)]
+
+
+_DATE_TOKEN = re.compile(
+    r"\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\s+[a-ząćęłńóśźż]+\s+\d{4}", re.IGNORECASE
+)
+
+
+def occurrence_segment(context: str) -> str | None:
+    """The text associated with the single »marked« occurrence (None without exactly one
+    marker): from the previous value token or sentence end to the next one, header excluded."""
+    marks = list(_MARKED.finditer(context))
+    if len(marks) != 1 or context.count("»") != 1 or context.count("«") != 1:
+        return None
+    mark = marks[0]
+    prefix = _BRACKETED_PREFIX.match(context)
+    body_start = prefix.end() if prefix else 0
+    left = context[body_start : mark.start()]
+    right = context[mark.end() :]
+    cut = max([end for _, end in _value_spans(left)]
+              + [m.end() for m in _SENTENCE_BREAK.finditer(left)] + [0])  # fmt: skip
+    stops = [start for start, _ in _value_spans(right)]
+    stops += [m.start() + 1 for m in _SENTENCE_BREAK.finditer(right)]
+    return left[cut:] + mark.group(1) + right[: min(stops, default=len(right))]
+
+
+def association_text(context: str) -> str:
+    segment = occurrence_segment(context)
+    return context if segment is None else segment
+
+
+def marked_value_matches(context: str, value: float, currency: str) -> bool:
+    """True without a marker; with one, the marked text must be this value (and currency, when
+    the marked text names one; a page-level currency is checked by grounding)."""
+    mark = _MARKED.search(context)
+    if mark is None:
+        return True
+    target = as_decimal(value)
+    return any(as_decimal(t.value) == target and t.currency in (None, currency)
+               for t in amounts_on_page(0, mark.group(1)))  # fmt: skip
 
 
 def _norm(text: str) -> str:
@@ -87,9 +151,12 @@ def has_qualifier(context: str, key: str) -> bool:
     return key in qualifiers_in(context)
 
 
-def conflicts(context: str, expected: set[str]) -> list[str]:
-    found = qualifiers_in(context)
+def conflicts(context: str, expected: set[str], entry: dict | None = None) -> list[str]:
     problems = []
+    if entry is not None and not marked_value_matches(context, entry["value"], entry["currency"]):
+        problems.append("marked occurrence is a different value")
+    context = association_text(context)
+    found = qualifiers_in(context)
     for group in EXCLUSIVE_GROUPS:
         present = found & group
         if len(present) > 1 or (present and expected & group and present - expected):
@@ -153,8 +220,8 @@ def _best_entry(entries: list[dict], expected: set[str]) -> dict | None:
     across duplicates."""
 
     def score(entry: dict) -> tuple[int, int]:
-        found = qualifiers_in(entry["context"])
-        return (len(found & expected), -len(conflicts(entry["context"], expected)))
+        found = qualifiers_in(association_text(entry["context"]))
+        return (len(found & expected), -len(conflicts(entry["context"], expected, entry)))
 
     return max(entries, key=score) if entries else None
 
@@ -165,8 +232,8 @@ def evaluate(
     """Automatic, fact-level checks. ``result`` must already be schema-valid."""
     checks: list[Check] = []
 
-    def add(category: str, name: str, ok: bool, detail: str = "") -> None:
-        checks.append(Check(category, name, bool(ok), "" if ok else detail))
+    def add(category: str, name: str, ok: bool, detail: str = "", manual: bool = False) -> None:
+        checks.append(Check(category, name, bool(ok), "" if ok else detail, manual and not ok))
 
     tokens, source_dates = source_index(request)
     doc = result["document"]
@@ -216,9 +283,10 @@ def evaluate(
         context = best["context"] if best else "amount missing"
         for key in sorted(expected):
             add("qualifiers", f"{label} same entry has '{key}'",
-                best is not None and has_qualifier(context, key), context)  # fmt: skip
+                best is not None and has_qualifier(association_text(context), key),
+                context)  # fmt: skip
         if best is not None:
-            bad = conflicts(context, expected)
+            bad = conflicts(context, expected, best)
             add("qualifiers", f"{label} entry has no contradicting qualifier", not bad,
                 f"{', '.join(bad)} in: {context}")  # fmt: skip
 
@@ -235,7 +303,8 @@ def evaluate(
             )
             shown = " & ".join("/" + "|".join(group) + "/" for group in groups)
             contexts = " | ".join(e["context"] for e in entries) or "date missing"
-            add("dates", f"{label} context names the event {shown}", ok, contexts)
+            manual = bool(entries) and fact.get("eventReview") == "manual"
+            add("dates", f"{label} context names the event {shown}", ok, contexts, manual)
 
     for bad in expect.get("forbiddenAmounts", []):
         hit = [a for a in result["amounts"] if as_decimal(a["value"]) == as_decimal(bad["value"])
@@ -285,7 +354,8 @@ def manual_evidence(request: dict[str, Any], result: dict[str, Any]) -> dict[str
         "keyPoints": [{"text": k, "numbers": numbers_in(k)} for k in result["keyPoints"]],
         "amountContexts": [
             {"value": a["value"], "currency": a["currency"], "context": a["context"],
-             "qualifiersDetected": sorted(qualifiers_in(a["context"]))}
+             "associatedText": association_text(a["context"]),
+             "qualifiersDetected": sorted(qualifiers_in(association_text(a["context"])))}
             for a in result["amounts"]
         ],
         "dateContexts": [{"date": d["date"], "context": d["context"],
@@ -342,7 +412,9 @@ def assess(
     else:
         checks.append(Check("latency", f"measured latency < {LATENCY_LIMIT_MS} ms (local only)",
                             latency_ms < LATENCY_LIMIT_MS, f"{latency_ms} ms"))  # fmt: skip
-    failed = [c for c in checks if not c.ok]
+    failed = [c for c in checks if not c.ok and not c.manual]
+    subchecks = [c for c in checks if c.manual]
+    checks = [c for c in checks if not c.manual]
     if failed:
         failures.append(f"{len(failed)} automatic check(s) failed")
 
@@ -353,6 +425,8 @@ def assess(
     manual = {dim: verdicts.get(dim, "unreviewed") for dim in MANUAL_DIMENSIONS}
     failures += [f"manual review failed: {d}" for d, v in manual.items() if v == "fail"]
     pending += [f"unreviewed: {d}" for d, v in manual.items() if v not in ("pass", "fail")]
+    if manual["contexts_meaning"] == "unreviewed":
+        pending += [f"manual subcheck (contexts_meaning): {c.name}" for c in subchecks]
 
     by_category: dict[str, list[int]] = {}
     for check in checks:
@@ -364,6 +438,7 @@ def assess(
         "total": len(checks),
         "byCategory": {k: f"{v[0]}/{v[1]}" for k, v in by_category.items()},
         "failed": [asdict(c) for c in failed],
+        "manualSubchecks": [asdict(c) for c in subchecks],
     }
     report["manual"] = {"resultSha256": digest, "dimensions": manual,
                         "evidence": manual_evidence(request, result)}  # fmt: skip

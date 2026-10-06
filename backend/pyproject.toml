@@ -36,3 +36,4 @@ known-first-party = ["pdf_insight", "evaluation"]
 "tests/**" = ["S", "RUF001"]
 "evaluation/run_live.py" = ["T201", "S310"]  # local CLI: prints a report, opens a localhost URL
 "evaluation/rescore.py" = ["T201"]
+"evaluation/oracle.py" = ["T201"]
