@@ -241,7 +241,7 @@ Open for both / delivery:
 - Two-column lines and whitespace tables: values kept but ownership/column mapping left to the
   reader.
 - Additional real PDFs (other languages/types).
-- F-08 accepted only if compact passes; unvalidated `chunked` does not count. **F-09 local history
+- F-08 remains open: compact passing does not implement long-document chunking; unvalidated `chunked` does not count. **F-09 local history
   and F-10 OCR are not implemented.**
 
 ## Next steps (proposed)
