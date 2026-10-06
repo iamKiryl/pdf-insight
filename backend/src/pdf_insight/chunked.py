@@ -6,6 +6,8 @@ call; each call gets min(AI_TIMEOUT_SECONDS, time left). At most ONE corrective 
 for the whole request (not per chunk), and only for invalid output with enough time left.
 Evidence grounding runs inside each chunk call's validation, so an unsupported fact is invalid
 output that uses the same single retry. Timeouts, quota and provider errors are never retried.
+A terminal failure latches before its slot is released, so no queued call is dispatched
+afterwards (provider usage of calls already in flight is not refunded by cancellation).
 If any call fails, all other calls are
 cancelled and the request fails: an incomplete extraction is never returned as a result.
 Concurrency does not guarantee a latency target.
@@ -89,6 +91,10 @@ def call_details(raw: Any) -> dict[str, Any]:
     return details
 
 
+class _AbortedAfterFailure(Exception):
+    """Raised by a queued call that acquired a slot after the request had already failed."""
+
+
 class _RetryBudget:
     def __init__(self, allowed: int) -> None:
         self.remaining = allowed
@@ -135,15 +141,24 @@ async def analyze_chunked(
     deadline = clock() + settings.ai_total_budget_seconds
     gate = asyncio.Semaphore(MAX_CONCURRENT_CALLS)
     retries = _RetryBudget(1)
+    # Terminal-failure latch: set BEFORE a failing call releases its semaphore slot and checked
+    # right after every acquisition, so no queued call is dispatched once the request has failed.
+    failed = asyncio.Event()
+
+    def terminal(error: BaseException) -> BaseException:
+        failed.set()
+        return error
 
     async def call(spec: CallSpec) -> Any:
         messages = spec.messages
         attempt = 0
         while True:
             async with gate:
+                if failed.is_set():
+                    raise _AbortedAfterFailure
                 remaining = deadline - clock()
                 if remaining <= 0:
-                    raise ApiError("AI_TIMEOUT")
+                    raise terminal(ApiError("AI_TIMEOUT"))
                 inputs = build_inputs(profile, messages, spec.schema, spec.max_tokens)
                 attempt += 1
                 usage.start()
@@ -169,32 +184,37 @@ async def analyze_chunked(
                     return parsed
                 except TimeoutError:
                     done("timeout")
-                    raise ApiError("AI_TIMEOUT") from None
+                    raise terminal(ApiError("AI_TIMEOUT")) from None
                 except asyncio.CancelledError:
                     done("cancelled")
+                    failed.set()
                     raise
                 except AIProviderError as exc:
                     done(f"provider_{exc.kind}")
                     if exc.kind == "quota":
-                        raise ApiError("AI_QUOTA_EXCEEDED") from None
+                        raise terminal(ApiError("AI_QUOTA_EXCEEDED")) from None
                     if exc.kind != "invalid_output":
-                        raise ApiError("AI_UNAVAILABLE") from None
+                        raise terminal(ApiError("AI_UNAVAILABLE")) from None
                     problems = ["the model could not produce JSON matching the schema"]
                 except InvalidModelOutput as exc:
                     problems = exc.problems
                     done("invalid_output", problems)
-            if deadline - clock() < MIN_RETRY_SECONDS:
-                raise ApiError("AI_TIMEOUT")
-            if not retries.take():
-                raise ApiError("AI_INVALID_OUTPUT")
-            stats.retries += 1
-            history = [{"role": "assistant", "content": raw_text[:8000]}] if raw_text else []
-            messages = [*spec.messages, *history, correction_message(problems)]
+                # Retry decision while still holding the slot: an exhausted budget is terminal
+                # and must latch before the slot is released. Invalid output with budget left
+                # is not terminal.
+                if deadline - clock() < MIN_RETRY_SECONDS:
+                    raise terminal(ApiError("AI_TIMEOUT"))
+                if not retries.take():
+                    raise terminal(ApiError("AI_INVALID_OUTPUT"))
+                stats.retries += 1
+                history = [{"role": "assistant", "content": raw_text[:8000]}] if raw_text else []
+                messages = [*spec.messages, *history, correction_message(problems)]
 
     tasks = [asyncio.create_task(call(spec)) for spec in specs]
     try:
         results = await asyncio.gather(*tasks)
     except BaseException:
+        failed.set()  # external cancellation too: queued calls must not start
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)

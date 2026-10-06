@@ -228,7 +228,9 @@ def test_a_failing_chunk_fails_the_request_and_cancels_the_rest():
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "AI_UNAVAILABLE"
     assert "amounts" not in response.json()  # no partial result
-    assert ai.cancelled  # in-flight calls were cancelled
+    # queued chunks are never dispatched after the failure (they would wait forever)
+    assert {label for label, _ in ai.calls} <= {"overview", "chunk-1", "chunk-2"}
+    assert "chunk-3" not in {label for label, _ in ai.calls}
 
 
 def test_quota_error_is_not_retried():
