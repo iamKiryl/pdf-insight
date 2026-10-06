@@ -446,3 +446,11 @@ docs/REVIEW_STABILITY.md с учётом Follow-up review. Если 8B уже з
   error; Claude added numeric-code logging (`3ff21cf`) and made call 2 → code 5025. Official JSON
   Mode list excludes the fp8 model → reported as incompatible, profile reverted (`18d9b55`), no
   other model tried, production unchanged. Decision recorded in docs/STATUS.md.
+
+## 2026-10-06 — Free runtime migration decision (Codex)
+
+User: «давай делать дальше». Prepared NEXT_FREE_RUNTIME.md: implement a thin TS compact Worker,
+keep Python as a parity reference/evaluator, retain server-side validation and Free bindings.
+Official JSON Mode list still names the non-fp8 Llama 3.1 8B, but its linked card returns 404;
+require catalogue confirmation before a new quota-bounded experiment. No inference or deployment
+by Codex. Backend migration will be reviewed before replacing the live Worker.
