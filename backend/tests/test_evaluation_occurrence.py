@@ -171,3 +171,11 @@ def test_person_name_mixed_from_two_inflections_is_ungrounded():
     result["entities"]["people"] = ["Joanna Wróbel"]
     names = {c.name for c in evaluate(OFFER["expect"], REQUEST, result) if not c.ok}
     assert "every person name is written in the source as given" not in names
+
+
+def test_internal_markers_in_user_visible_text_fail():
+    result = reference()
+    result["summary"] = result["summary"].replace("31 października", "⟦D3⟧31 października", 1)
+    result["keyPoints"][0] = "⟦A5⟧" + result["keyPoints"][0]
+    names = {c.name for c in evaluate(OFFER["expect"], REQUEST, result) if not c.ok}
+    assert "no internal candidate markers in user-visible text" in names

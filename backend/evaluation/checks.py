@@ -33,7 +33,7 @@ from pydantic import ValidationError
 from evaluation.sources import amounts_on_page, as_decimal, dates_on_page
 from pdf_insight.contract import AnalysisResult
 
-EVALUATOR_VERSION = "eval-v5-2026-10-06"
+EVALUATOR_VERSION = "eval-v6-2026-10-06"
 LATENCY_LIMIT_MS = 30_000  # the brief's target; a local measurement never certifies deployment
 
 # Qualifier vocabulary (Polish + English stems).
@@ -312,6 +312,11 @@ def evaluate(
                and a["currency"] == bad["currency"]]  # fmt: skip
         add("injection", f"no amount {bad['value']} {bad['currency']}", not hit,
             " | ".join(a["context"] for a in hit))  # fmt: skip
+    texts = [doc["title"], result["summary"], *result["keyPoints"], *result["keywords"],
+             *result["entities"]["organizations"], *result["entities"]["people"]]  # fmt: skip
+    leaked = [t for t in texts if "⟦" in t or "⟧" in t]
+    add("language", "no internal candidate markers in user-visible text", not leaked,
+        " | ".join(leaked)[:300])  # fmt: skip
     narrative = " ".join([result["summary"], *result["keyPoints"]]).casefold()
     for pattern in expect.get("forbiddenNarrative", []):
         add("injection", f"summary/keyPoints free of /{pattern}/",
