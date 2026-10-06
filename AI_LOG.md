@@ -375,3 +375,14 @@ Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_RELEASE_CHECKP
   immediately). Exported JSON saved to `.local` through a one-shot localhost receiver.
 - Redeployed the committed config (version `a4695cc8`); localhost now 403. Worker CPU time and the
   deployed call count were not observable from the CLI; recorded as not observed.
+
+
+## 2026-10-06 — Deployment review and next checkpoint (Codex)
+
+User: «claude закончил». Reviewed 3c76fa8 and deployment-config diff. Read-only live checks:
+health 200, Pages preflight 204, foreign preflight 403, invalid-body POSTs 400 then production
+429. No model calls; source confirms rate limiting precedes body validation. Initial urllib
+client got edge 1010, curl reached the app. Exact five-request enforcement is not claimed.
+Prepared docs/REVIEW_PUBLIC_DEMO.md: bounded browser history, public repository/Pages via existing
+CI, one quota-bounded public sample analysis, CPU observations and current delivery documentation.
+Flagged inference of deployed provider-call count from elapsed time as insufficient evidence.

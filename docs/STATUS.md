@@ -1,3 +1,13 @@
+# Current snapshot — 2026-10-06
+
+Backend deployed in compact mode; public Pages frontend is still pending. Claude reports accepted
+live runs I/J/K, including 25.3 s upload-to-render with the deployed backend. Codex independently
+verified health, CORS and production 429 without model calls. CPU consumption remains unobserved.
+F-08, F-09 and F-10 remain open. Next task: docs/REVIEW_PUBLIC_DEMO.md.
+
+The sections below retain dated checkpoint history; their earlier deployment/verification claims
+refer to those checkpoints, not the current snapshot.
+
 # Status — Stage 1 (executable vertical slice)
 
 Date: 2026-10-05. Implementer: Claude Code (Opus, subscription). Reviewer: Codex.
@@ -238,7 +248,7 @@ upload-to-render 25.3 s, 71/71, page-11 warning and JSON export verified. Calls 
 | Free CPU per request | **not observed** (dashboard Metrics needed); no resource-limit error seen |
 | AI quota | ≈ 410 neurons per sample analysis (own estimate); actual usage unknown |
 | CORS | verified on the Worker (Pages origin allowed, others 403); requests without Origin are only rate limited |
-| Rate limiting | bindings deployed; production 429 not verified |
+| Rate limiting | Codex independently observed production 429 on invalid-body requests, no AI calls (2026-10-06); eventually consistent, per location |
 | Frontend | GitHub Pages not published; live URL, pdf.js worker, screenshot, 14-day availability open |
 | Quality | long sample: model selects nearly every candidate (verbose); two-column/whitespace-table mapping left to the reader; people list completeness varies |
 | Old single mode | baseline only: 30.1–35.4 s locally, sample 44/65 (eval-v3) |
