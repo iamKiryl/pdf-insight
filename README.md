@@ -43,7 +43,7 @@ Browser (GitHub Pages, React SPA)                Cloudflare Python Worker (FastA
 | Summary length | 3–5 sentences checked with a conservative sentence-count interval that handles `sp. z o.o.`, `S.A.`, decimals and initials (see contracts/README.md). |
 | Missing title | Deterministic neutral label in the document language (`Dokument bez tytułu`, `Untitled document`, …) with `analysis.titleFallback = true`. |
 | Scans | Pages without a text layer are listed in `analysis.pagesWithoutText` and shown as a partial-analysis warning; a fully scanned PDF gets an actionable error. No OCR yet. |
-| Analysis mode | `AI_MODE=compact` (experimental): code extracts candidate amounts/dates with source offsets, one model call selects their IDs, values and contexts are copied from the source (≤ 30 000 chars, ≤ 400 candidates); first trial 22.6 s but failed the quality gate (docs/LIVE_AI_RESULTS.md). `AI_MODE=single` (default): one model call, up to 48 000 chars of text. `AI_MODE=chunked` (experimental, F-08): overview call + one call per ≤ 10 000-char chunk (≤ 8), at most 2 in flight, one overall deadline, one retry per request, evidence-grounded deterministic merge, up to 64 000 chars. Not the default until compared on real AI — see [docs/CHUNKING.md](docs/CHUNKING.md). |
+| Analysis mode | `AI_MODE=compact` (experimental): code extracts candidate amounts/dates with source offsets, one model call selects their IDs, values and contexts are copied from the source (≤ 30 000 chars, ≤ 400 candidates); second trial 23.8 s with all automatic checks passed, but key points copied the summary, so it is still unaccepted (docs/LIVE_AI_RESULTS.md). `AI_MODE=single` (default): one model call, up to 48 000 chars of text. `AI_MODE=chunked` (experimental, F-08): overview call + one call per ≤ 10 000-char chunk (≤ 8), at most 2 in flight, one overall deadline, one retry per request, evidence-grounded deterministic merge, up to 64 000 chars. Not the default until compared on real AI — see [docs/CHUNKING.md](docs/CHUNKING.md). |
 | Body limit | The Workers ASGI adapter buffers the body before FastAPI runs, so the entrypoint rebuilds **every** request first: only `POST /api/analyze` reads its body (rejected from an oversized declared `Content-Length` without reading, otherwise streamed and abandoned after `MAX_BODY_BYTES + 1` bytes); all other paths and methods are forwarded without a body. Middleware enforces the same policy again. |
 | Rate limiting | Cloudflare Rate Limiting bindings: 5 req/60 s per client IP and 30 req/60 s global. Counters are per Cloudflare location and eventually consistent (documented by Cloudflare). In production the API fails closed (503) if a binding is missing or errors. |
 | CORS | Origin allowlist from `ALLOWED_ORIGINS`, read per request. CORS is not treated as protection against direct requests; rate limits are. |
@@ -120,9 +120,10 @@ is automated later).
 
 - Not deployed; no live AI verification, CPU/latency/quota measurements or public URL yet.
 - No OCR (F-10): image-only pages are reported, not read.
-- Compact mode is an unaccepted experiment: numbers split across PDF lines are not joined (a
-  wrong "200 PLN" in the trial), the model did not drop repeated footers, and source-sentence
-  contexts that state net and gross together fail the evaluator's contradiction check.
+- Compact mode is an unaccepted experiment: the model selects nearly every candidate (verbose,
+  repeated amounts) and its key points copied the summary in the live trial. Whitespace tables
+  show the column header but leave cell-to-column mapping to the reader; two-column lines (e.g.
+  both parties' share capital) keep both values without saying which belongs to whom.
 - Chunking (F-08) exists only as an opt-in experiment (`AI_MODE=chunked`), tested with scripted
   provider responses, not with the real model. In the default single mode text over 48 000
   characters is rejected with a clear message; the request envelope is 64 000 characters. Nothing

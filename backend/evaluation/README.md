@@ -1,4 +1,4 @@
-# Live-quality evaluation (evaluator v3)
+# Live-quality evaluation (evaluator v4)
 
 Offline checks for real model outputs. Nothing here calls the model or another judge. `run_live.py`
 sends one request to a **locally running** Worker (`uv run pywrangler dev`), which may call the
@@ -21,6 +21,19 @@ integers); percentages and zero-padded identifiers are not amounts. Dates: ISO, 
 "12 marca 2026", "March 12, 2026".
 
 These checks establish presence, association and grounding — **not semantic entailment**.
+
+### Source-quote contexts (v4)
+
+Compact-mode contexts quote the source and mark the selected occurrence as `»value«` (a bracketed
+`[header]` may precede the excerpt). For a context with exactly one marker, qualifiers are taken
+only from the text between the neighbouring value tokens (money or dates) or sentence ends around
+the marker, the header excluded, and the marked text must parse to the entry's own value. So a
+true sentence stating net, VAT and gross together is not a contradiction, while a net/gross swap,
+a wrong period, a wrong event or a marker on another value still fail. Contexts without a marker
+keep the blanket rule. A case may mark a date-event subcheck `"eventReview": "manual"` (an
+issue-date header that names no role): when it does not match it is listed under
+`manualSubchecks`, never passed or failed automatically, and only a `contexts_meaning` review of
+that exact result resolves it. A missing date still fails.
 
 ## What needs a human (never counted as passed automatically)
 
@@ -64,4 +77,6 @@ uv run python -m evaluation.run_live --case synthetic_offer_pl --label <label> -
   --manual-review <review.json>
 # re-evaluate saved responses offline (manifest lists response paths, HTTP status, latency)
 uv run python -m evaluation.rescore ../.local/live/rescore-manifest.json
+# compact prerequisite before any live call: exact expected candidates, production assembly
+uv run python -m evaluation.oracle --case sample_contract --case synthetic_offer_pl
 ```

@@ -292,3 +292,30 @@ Prompt (human → Claude, verbatim): «Выполни docs/ADR_COMPACT_ANALYSIS.
   as AI) failed contexts: a wrong "200 PLN" produced by Claude's candidate parser from
   "295\n200,00" split across lines, footer dates selected, legal forms dropped. Stopped: the
   synthetic offer was not run; nothing was tuned after the call.
+
+## 2026-10-06 — Compact correction checkpoint (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_COMPACT.md. Архитектуру compact сохраняем.
+Исправь числа с переносами, контексты конкретных значений, колонтитулы и юридические формы. Добавь
+регрессионные тесты. Не ослабляй проверки фактических противоречий. Сначала проверь сборку
+результата офлайн с заведомо правильным выбором кандидатов на обоих документах. Только после
+успешной проверки — живой договор, затем при успехе второй документ. Максимум 4 вызова модели с
+учётом коррекций, без публикации.»
+
+- Reproduced the review's defects before fixing (`.local/live/compact-review-before-fix.txt`):
+  200 PLN from "295\n200,00", a 498-character context without its 12345, 4 footer dates.
+- First wrap rule (≥ 3 words before the prefix) could not separate "Wynagrodzenie wynosi 295" from
+  a table row "Pozycja A 12"; replaced by a full-line rule (a PDF wrap happens at the margin:
+  ≥ 60 characters) plus reference-number exclusion. Tests made realistic.
+- Reviewing every candidate context against the source (before any call) exposed further own
+  defects, all fixed with regressions: the §5 amount "184 500,00\nzł netto" was not a candidate
+  at all (currency on the next line); the wrapped-number line was treated as a table row,
+  producing a "200,00 zł …" fragment; rows 9–18 of the price list and the invoice settlement table
+  lost their headers (search limit, non-capitalised header); initials ("P. Dąbrowski") ended
+  sentences; next paragraph numbers ("2.") leaked into sentences; a sentence below a table was read
+  as a row.
+- Evaluator v4 and `evaluation/oracle.py`: oracle passed 68/68 (sample) and 71/71 + 1 manual
+  subcheck (offer). Contexts reviewed by Claude (AI), not by a human.
+- Live: one sample call, 200 in 23.8 s, 69/69 automatic; manual review (Claude, AI) failed
+  key points — verbatim copies of summary sentences despite prompt v2. Stopped: the offer was not
+  run, nothing tuned after the call. The model still selects nearly every candidate.

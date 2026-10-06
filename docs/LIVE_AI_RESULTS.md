@@ -437,3 +437,85 @@ complete but verbose (75 amounts, 50 dates, many repeated).
 ## Not done
 
 The synthetic offer (gate not met), any prompt/rule tuning, deployment.
+
+# Compact correction trial — 2026-10-06 (docs/REVIEW_COMPACT.md)
+
+**Result: the offline oracle passed on both cases, the live sample returned 200 in 23.8 s with
+one model call and passed all 69 automatic checks (evaluator v4), but it FAILED the quality gate
+on manual review: the three key points are verbatim copies of summary sentences. The synthetic
+offer was therefore not run. Model calls used: 1 of the 4 allowed.** Earlier results above keep
+their original scores (eval-v3).
+
+## What changed before the call (commits `fdf6e47`, `028c53a`, `cc070c1`)
+
+- Numbers wrapped at a full prose line ("295\n200,00 zł") are one token with original offsets;
+  ambiguous wraps (short rows, page numbers) are rejected, never emitted as the suffix; a currency
+  may follow one line break ("184 500,00\nzł netto" — this §5 amount was not a candidate before).
+- Contexts mark the selected occurrence as »value« (with its currency), put the column header or
+  section heading in brackets and are cut around the value, so it can never be lost; flattened
+  table rows, long tables, initials and numbered paragraphs are handled.
+- Repeated running headers/footers with page/version marks are not candidates; equal dates in one
+  excerpt and identical amount contexts are deduplicated; short organisation names resolve only to
+  a unique full name with legal form; prompt `compact-v2-2026-10-06`.
+- Evaluator v4: qualifiers are associated with the marked occurrence only (net/VAT/gross in one
+  true sentence are no longer a contradiction); swap, wrong period, wrong event and a marker on a
+  different value still fail; unmarked contexts keep the blanket rule. The offer's
+  "Warszawa, dnia 4 września 2026 r." event check is a manual subcheck (resolved only by a
+  contexts_meaning review).
+
+## Offline prerequisites (no model calls)
+
+| Check | Result |
+|---|---|
+| Regressions from the review (wrap, lost value, footers, dedup, legal forms, occurrence association) | reproduced first (`.local/live/compact-review-before-fix.txt`: 200 PLN, 498-char context without its value, 4 footer dates), now pass |
+| `evaluation.oracle` — exactly the expected candidates, production assembly | sample 68/68, offer 71/71 + 1 manual subcheck; organisations resolved from short names |
+| Source review of the oracle contexts (Claude, AI) | acceptable; limitations: two-column capital line does not say which company owns which capital; whitespace tables leave cell-to-column mapping to the reader; signing-date sentence starts with running header text (`.local/live/oracle/source-review-claude.md`) |
+| Backend | ruff clean, pytest 422 passed |
+
+## Call
+
+| Label | Attempt | Outcome | Duration | Tokens (in / out) | Finish | Output bytes |
+|---|---|---|---|---|---|---|
+| compact | 1 | ok | 23 691 ms | 9 822 / 716 | stop | 1 512 |
+
+Server 23 757 ms, client round trip 23 792 ms (local `pywrangler dev`, not deployed
+upload-to-result). ≈ 410 neurons; own accounting for 2026-10-06 UTC ≈ 820 neurons (two calls).
+Input: 116 candidates (77 amounts, 39 dates) — footers removed. Evidence:
+`.local/live/tuning/G-compact-v2-sample/` (response, meta, server log lines, evaluator report,
+AI manual review).
+
+## Evaluator v4 (automatic): 69/69
+
+Metadata, coverage, document type/language/date/title, both organisations with legal forms, all 11
+amounts with their qualifiers (25/25), all 7 dates with their events, injection (no 1 PLN, no
+invalidity claim), grounding and local latency passed.
+
+## Manual review against the source (by Claude, an AI — not a human review)
+
+| Dimension | Verdict | Specific findings |
+|---|---|---|
+| summary_factual | pass | 4 supported sentences: parties with legal forms, signed 12.03.2026, CRM implementation and maintenance, 24 months with automatic 12-month extension, 184 500,00 zł netto; does not claim the scanned annex was read |
+| key_points_factual | **fail** | the 3 points are verbatim copies of summary sentences 1–3; facts correct, but no payments, SLA, penalties or deadlines — the review's "distinct informative key points" requirement is not met although prompt v2 forbids repeating the summary |
+| contexts_meaning | pass | 76 amount and 38 date contexts are source quotes with the correct marked occurrence; no wrong value (295 200,00 zł), no footer dates, penalty and price tables readable; limitations as in the oracle review, plus "ponad 30 [dni]" losing its continuation word |
+| language_fidelity | pass | correct Polish; outside the dimensions the people list has "Marek Zielińskiego" (genitive surname) and omits 6 named persons (trial F had 8) |
+
+Evaluator status with this review: **failed** (`manual review failed: key_points_factual`).
+
+## Findings
+
+1. The code-side defects from the review are fixed: no wrong value, contexts identify their own
+   occurrence, footers are gone, legal forms resolve, the evaluator no longer penalises true
+   multi-value sentences — shown offline with the oracle and in the live result (69/69).
+2. Latency stays under 30 s locally: 23.8 s for one call (22.6 s in trial F).
+3. The model does not discriminate: it selected 76 of 77 amount candidates and every date
+   candidate, excluding only the injected 1 PLN; restatements (184 500 ×4, invoice totals ×3) and
+   reference-only dates (3 czerwca 2024, 1 stycznia 2014) remain despite "select each fact once".
+   Every entry is a correct source quote, so this is verbosity, not falsehood.
+4. Narrative quality is the blocker: key points copy the summary verbatim; the people list
+   regressed. Not fixable by code-side assembly; it needs either a deterministic key-point check
+   with one correction (costs a second call), a different prompt structure or a model decision —
+   a review decision, not tuned here.
+
+## Not done
+
+The synthetic offer (gate not met), any tuning after the call, default change, deployment.

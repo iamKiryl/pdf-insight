@@ -51,12 +51,13 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 | Provider failure / timeout / quota | Done, tested (mocks) | pytest 502/503/504 mapping, error text classification |
 | No `any`, `console.log`, `dangerouslySetInnerHTML` | Enforced | ESLint rules (`no-explicit-any`, `no-console`, restricted JSX attribute); Vitest renders hostile markup as text |
 
-## Commands executed (all passed at the chunked-extraction checkpoint)
+## Commands executed (all passed at the compact-correction checkpoint)
 
 ```
 backend$  uv run ruff check .            # All checks passed
 backend$  uv run ruff format --check .   # all files formatted
-backend$  uv run pytest -q               # 377 passed (341 before the compact checkpoint, 96 in Stage 1)
+backend$  uv run pytest -q               # 422 passed (377 before the compact correction, 96 in Stage 1)
+backend$  uv run python -m evaluation.oracle --case sample_contract --case synthetic_offer_pl   # PASS 68/68, 71/71
 backend$  uv lock --check                # lock up to date
 frontend$ npm run lint                   # 0 problems (--max-warnings=0)
 frontend$ npm run format:check           # all files formatted
@@ -191,6 +192,20 @@ v3 failed 61/69 (legal forms dropped; 5 "contradicting qualifier" checks that al
 perfect selection because source sentences state net/VAT/gross together); manual review failed on
 contexts (wrong "200 PLN" from "295\n200,00" split across lines, 9 footer dates selected). Gate
 not met, so the synthetic offer was not run (1 of 4 calls used). Default remains single-call.
+
+## Compact correction (docs/REVIEW_COMPACT.md) — see docs/LIVE_AI_RESULTS.md
+
+`fdf6e47`: line-wrapped numbers reconstructed or rejected (never the suffix), currency after a
+line break, contexts that mark the selected »occurrence« and are cut around it, flattened-table
+rows with headers, repeated page/version footers excluded, dedup of identical facts, legal-form
+resolution to a unique full name, prompt `compact-v2`. `028c53a`: evaluator v4 (qualifiers of the
+marked occurrence only; negative regressions kept; manual subcheck for an unnamed issue-date
+header) and `evaluation/oracle.py`. `cc070c1`: live report named after the evaluator version.
+Offline oracle passed on both cases (68/68, 71/71 + 1 manual subcheck). One live sample call:
+200 in 23.8 s, 9 822 / 716 tokens, evaluator v4 69/69 automatic; manual review (Claude, AI)
+failed key points (verbatim copies of the summary). Gate not met, synthetic offer not run
+(1 of 4 calls used). The model selects nearly every candidate (76/77 amounts, all dates).
+F-08 compact remains experimental; default `single`.
 
 ## Release gates still open
 
