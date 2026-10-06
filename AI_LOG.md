@@ -319,3 +319,24 @@ Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_COMPACT.md. А
 - Live: one sample call, 200 in 23.8 s, 69/69 automatic; manual review (Claude, AI) failed
   key points — verbatim copies of summary sentences despite prompt v2. Stopped: the offer was not
   run, nothing tuned after the call. The model still selects nearly every candidate.
+
+## 2026-10-06 — UI aligned with the recruitment brief (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «После текущих исправлений compact оформи интерфейс по заданию:
+../PDF_Insight_Visual_Brief.md. Сначала посмотри указанные изображения брифа. Сделай отдельный
+UI-коммит, проверь desktop и 360px, сохрани скриншоты. Логику анализа и критерии качества не меняй.»
+
+- Looked at brief-1.png and brief-3.png first. Rewrote `styles.css` (dark by default, tokens with
+  measured WCAG contrast: text 17.8:1, muted 9.4:1, faint 6.2:1, control borders 4.6:1, button text
+  on lime 16:1), new masthead, numbered report sections, value-over-context tables below 560 px
+  (explicit ARIA table roles keep semantics), amber ⚠ partial warning, red ✕ error label.
+- New `FlowSteps` + `lib/flowSteps.ts` (unit-tested): steps 01–04 derived only from FlowState; the
+  error state got a `stage` field (upload/read/analyze) so the failed step is marked. No progress
+  percentage, steps are not buttons. Analysis logic, API client and validation unchanged.
+- Own mistakes caught in the browser: an "i" symbol before the data notice read as the letter I
+  (removed); the 360 px context column was ~150 px wide (stacked rows); finished state had no
+  `aria-current` step (explicit `current` flag).
+- Checked in the in-app browser at 1280 px and 360 px against a local stub (`ui_stub.py`, scratchpad;
+  hand-made fixture with long contexts, slow and 503 modes): idle, ready + partial warning, loading,
+  error, result; no horizontal page scroll; visible keyboard focus. Screenshots saved with headless
+  Chrome (fresh temporary profile, localhost only) to `docs/screenshots/`. No live AI calls.

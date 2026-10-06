@@ -14,6 +14,7 @@ export function ReadingStatus(props: {
   const progress = props.total ? `strona ${props.page} z ${props.total}` : 'otwieranie pliku';
   return (
     <section className="panel" aria-busy="true">
+      <p className="label label--accent">02 · Odczyt tekstu</p>
       <h2 className="panel__title">Odczytywanie dokumentu</h2>
       <p className="muted">
         {props.fileName} — {progress}
@@ -44,6 +45,7 @@ export function ReadyPanel(props: {
   useEffect(() => buttonRef.current?.focus(), []);
   return (
     <section className="panel" aria-labelledby="ready-title">
+      <p className="label label--accent">02 · Tekst odczytany</p>
       <h2 id="ready-title" className="panel__title">
         Dokument gotowy do analizy
       </h2>
@@ -100,14 +102,18 @@ export function AnalyzingStatus(props: {
     };
   }, [props.startedAt]);
   return (
-    <section className="panel" aria-busy="true">
+    <section className="panel panel--active" aria-busy="true">
+      <p className="label label--accent">03 · Analiza AI</p>
       <h2 className="panel__title">Analiza w toku…</h2>
       <p className="muted break">{props.fileName}</p>
-      <div className="spinner" aria-hidden="true" />
-      <p>
-        Czas: <span className="tabular">{formatSeconds(elapsed)}</span>. Model AI czyta tekst i
-        wyodrębnia dane; może to potrwać kilkadziesiąt sekund.
-      </p>
+      <div className="working">
+        <div className="spinner" aria-hidden="true" />
+        <p className="working__time">
+          <span className="label">Czas</span>{' '}
+          <span className="tabular">{formatSeconds(elapsed)}</span>
+        </p>
+      </div>
+      <p>Model AI czyta tekst i wyodrębnia dane; może to potrwać kilkadziesiąt sekund.</p>
       <button type="button" className="button" onClick={props.onCancel}>
         Anuluj analizę
       </button>
@@ -124,6 +130,9 @@ export function ErrorPanel(props: {
   useEffect(() => headingRef.current?.focus(), [props.message]);
   return (
     <section className="panel panel--error" role="alert" aria-labelledby="error-title">
+      <p className="label label--error">
+        <span aria-hidden="true">✕ </span>Błąd
+      </p>
       <h2 id="error-title" ref={headingRef} tabIndex={-1} className="panel__title">
         {props.message.title}
       </h2>

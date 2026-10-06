@@ -19,7 +19,10 @@ export function ResultView({ result, durationMs, onReset }: Props) {
 
   return (
     <article className="result" lang={doc.language} aria-labelledby="result-title">
-      <header className="panel">
+      <header className="panel panel--report">
+        <p className="label label--accent" lang="pl">
+          04 · Wynik analizy
+        </p>
         <p className="eyebrow" lang="pl">
           {DOCUMENT_TYPE_LABELS[doc.type]} · {languageName(doc.language)} · {doc.pages}{' '}
           {doc.pages === 1 ? 'strona' : 'str.'}
@@ -39,12 +42,12 @@ export function ResultView({ result, durationMs, onReset }: Props) {
         )}
       </header>
 
-      <Section title="Podsumowanie">
+      <Section number="01" title="Podsumowanie">
         <p className="summary">{result.summary}</p>
       </Section>
 
-      <Section title="Kluczowe punkty">
-        <ul className="list">
+      <Section number="02" title="Kluczowe punkty" count={result.keyPoints.length}>
+        <ul className="list list--marked">
           {result.keyPoints.map((point) => (
             <li key={point}>{point}</li>
           ))}
@@ -52,34 +55,40 @@ export function ResultView({ result, durationMs, onReset }: Props) {
       </Section>
 
       <div className="grid">
-        <Section title="Organizacje">
+        <Section number="03" title="Organizacje" count={result.entities.organizations.length}>
           <TextList items={result.entities.organizations} />
         </Section>
-        <Section title="Osoby">
+        <Section number="04" title="Osoby" count={result.entities.people.length}>
           <TextList items={result.entities.people} />
         </Section>
       </div>
 
-      <Section title="Kwoty">
+      <Section number="05" title="Kwoty" count={result.amounts.length}>
         {result.amounts.length === 0 ? (
           <Empty />
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="facts-table" role="table">
               <caption className="visually-hidden">Kwoty wymienione w dokumencie</caption>
-              <thead lang="pl">
-                <tr>
-                  <th scope="col">Kwota</th>
-                  <th scope="col">Kontekst</th>
+              <thead lang="pl" role="rowgroup">
+                <tr role="row">
+                  <th scope="col" role="columnheader">
+                    Kwota
+                  </th>
+                  <th scope="col" role="columnheader">
+                    Kontekst
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {result.amounts.map((amount, index) => (
-                  <tr key={`${String(index)}-${amount.context}`}>
-                    <td className="nowrap tabular">
+                  <tr role="row" key={`${String(index)}-${amount.context}`}>
+                    <td role="cell" className="nowrap tabular value">
                       {formatAmount(amount.value, amount.currency)}
                     </td>
-                    <td>{amount.context}</td>
+                    <td role="cell" className="context">
+                      {amount.context}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -88,26 +97,32 @@ export function ResultView({ result, durationMs, onReset }: Props) {
         )}
       </Section>
 
-      <Section title="Daty">
+      <Section number="06" title="Daty" count={result.dates.length}>
         {result.dates.length === 0 ? (
           <Empty />
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="facts-table" role="table">
               <caption className="visually-hidden">Daty wymienione w dokumencie</caption>
-              <thead lang="pl">
-                <tr>
-                  <th scope="col">Data</th>
-                  <th scope="col">Kontekst</th>
+              <thead lang="pl" role="rowgroup">
+                <tr role="row">
+                  <th scope="col" role="columnheader">
+                    Data
+                  </th>
+                  <th scope="col" role="columnheader">
+                    Kontekst
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {result.dates.map((date, index) => (
-                  <tr key={`${String(index)}-${date.date}`}>
-                    <td className="nowrap">
+                  <tr role="row" key={`${String(index)}-${date.date}`}>
+                    <td role="cell" className="nowrap tabular value">
                       <time dateTime={date.date}>{formatDate(date.date)}</time>
                     </td>
-                    <td>{date.context}</td>
+                    <td role="cell" className="context">
+                      {date.context}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -116,7 +131,7 @@ export function ResultView({ result, durationMs, onReset }: Props) {
         )}
       </Section>
 
-      <Section title="Słowa kluczowe">
+      <Section number="07" title="Słowa kluczowe" count={result.keywords.length}>
         {result.keywords.length === 0 ? (
           <Empty />
         ) : (
@@ -130,6 +145,9 @@ export function ResultView({ result, durationMs, onReset }: Props) {
 
       <section className="panel" lang="pl" aria-labelledby="json-title">
         <h3 id="json-title" className="section__title">
+          <span className="section__number" aria-hidden="true">
+            08
+          </span>
           Dane JSON
         </h3>
         <p className="muted">
@@ -160,13 +178,17 @@ export function ResultView({ result, durationMs, onReset }: Props) {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section(props: { number: string; title: string; count?: number; children: ReactNode }) {
   return (
     <section className="panel">
       <h3 className="section__title" lang="pl">
-        {title}
+        <span className="section__number" aria-hidden="true">
+          {props.number}
+        </span>
+        {props.title}
+        {props.count !== undefined && <span className="section__count"> ({props.count})</span>}
       </h3>
-      {children}
+      {props.children}
     </section>
   );
 }
@@ -174,7 +196,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function TextList({ items }: { items: readonly string[] }) {
   if (items.length === 0) return <Empty />;
   return (
-    <ul className="list">
+    <ul className="list list--marked">
       {items.map((item) => (
         <li key={item}>{item}</li>
       ))}

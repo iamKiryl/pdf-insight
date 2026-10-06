@@ -7,6 +7,16 @@ organizations, people, amounts, dates, keywords) as validated JSON you can downl
 > run against live Workers AI, and the <30 s target is unmeasured. See
 > [docs/STATUS.md](docs/STATUS.md) for what is implemented, tested and pending.
 
+## Interface
+
+Dark interface in the visual language of the recruitment brief (near-black panels, one lime
+accent, numbered monospace labels), Polish UI, four-step indicator driven by the real flow state.
+Screenshots below come from a **local stub with a hand-made fixture** (no live AI, not an analysis
+result): [desktop](docs/screenshots/desktop-result.png), [mobile 360 px](docs/screenshots/mobile-result.png),
+[idle](docs/screenshots/desktop-idle.png), [ready with a scanned page](docs/screenshots/mobile-ready.png).
+
+![PDF Insight result view (local fixture)](docs/screenshots/desktop-result.png)
+
 ## Architecture
 
 ```

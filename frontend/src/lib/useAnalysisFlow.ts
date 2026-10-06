@@ -19,6 +19,8 @@ export type FlowState =
   | { phase: 'done'; doc: ExtractedDocument; result: AnalysisResult; durationMs: number }
   | {
       phase: 'error';
+      /** Where the flow stopped (shown by the step indicator). */
+      stage: 'upload' | 'read' | 'analyze';
       message: UserMessage;
       retry: { doc: ExtractedDocument; readiness: Readiness } | null;
     };
@@ -54,7 +56,12 @@ export function useAnalysisFlow(deps: { analyze?: Analyze; extract?: Extract } =
       const run = startRun();
       const problem = checkFile(file);
       if (problem) {
-        setState({ phase: 'error', message: fileProblemMessage(problem), retry: null });
+        setState({
+          phase: 'error',
+          stage: 'upload',
+          message: fileProblemMessage(problem),
+          retry: null,
+        });
         return;
       }
       setState({ phase: 'reading', fileName: file.name, page: 0, total: 0 });
@@ -65,14 +72,24 @@ export function useAnalysisFlow(deps: { analyze?: Analyze; extract?: Extract } =
         if (!run.isCurrent()) return;
         const readiness = prepareRequest(doc);
         if (readiness.problem) {
-          setState({ phase: 'error', message: readinessMessage(readiness.problem), retry: null });
+          setState({
+            phase: 'error',
+            stage: 'read',
+            message: readinessMessage(readiness.problem),
+            retry: null,
+          });
           return;
         }
         setState({ phase: 'ready', doc, readiness });
       } catch (error) {
         if (!run.isCurrent()) return;
         const reason = error instanceof PdfExtractionError ? error.reason : 'corrupt';
-        setState({ phase: 'error', message: extractionMessage(reason), retry: null });
+        setState({
+          phase: 'error',
+          stage: 'read',
+          message: extractionMessage(reason),
+          retry: null,
+        });
       }
     },
     [extract, startRun],
@@ -93,7 +110,8 @@ export function useAnalysisFlow(deps: { analyze?: Analyze; extract?: Extract } =
           error instanceof ApiClientError ? error : new ApiClientError('NETWORK_ERROR', null, true);
         if (clientError.code === 'CANCELLED') return;
         const message = apiErrorMessage(clientError);
-        setState({ phase: 'error', message, retry: message.retryable ? { doc, readiness } : null });
+        const retry = message.retryable ? { doc, readiness } : null;
+        setState({ phase: 'error', stage: 'analyze', message, retry });
       }
     },
     [analyze, startRun],

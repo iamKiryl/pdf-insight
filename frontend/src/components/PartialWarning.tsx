@@ -12,6 +12,9 @@ export function PartialWarning({ pages, total, before = false }: Props) {
   const verb = pages.length === 1 ? 'nie zawiera' : 'nie zawierają';
   return (
     <div className="warning" role="note">
+      <span className="warning__symbol" aria-hidden="true">
+        ⚠
+      </span>
       <strong>{before ? 'Analiza będzie częściowa.' : 'Analiza częściowa.'}</strong> {label}{' '}
       {formatPageList(pages)} (z {total}) {verb} tekstu — prawdopodobnie to skany lub obrazy. Bez
       OCR ich treść nie {before ? 'zostanie' : 'została'} przeanalizowana, więc wynik może pomijać

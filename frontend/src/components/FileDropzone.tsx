@@ -12,7 +12,7 @@ export function FileDropzone({ onFile }: Props) {
   const hintId = useId();
   const [dragging, setDragging] = useState(false);
 
-  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
     setDragging(false);
     const file = event.dataTransfer.files[0];
@@ -20,8 +20,9 @@ export function FileDropzone({ onFile }: Props) {
   };
 
   return (
-    <div
+    <section
       className={`dropzone${dragging ? ' dropzone--active' : ''}`}
+      aria-labelledby="dropzone-title"
       onDragOver={(event) => {
         event.preventDefault();
         setDragging(true);
@@ -31,8 +32,11 @@ export function FileDropzone({ onFile }: Props) {
       }}
       onDrop={handleDrop}
     >
-      <p className="dropzone__title">Przeciągnij plik PDF tutaj</p>
-      <p className="dropzone__or">lub</p>
+      <p className="label label--accent">01 · Wgraj PDF</p>
+      <h2 id="dropzone-title" className="dropzone__title">
+        {dragging ? 'Upuść plik, aby go wczytać' : 'Przeciągnij plik PDF tutaj'}
+      </h2>
+      <p className="dropzone__or">albo</p>
       <button
         type="button"
         className="button button--primary"
@@ -42,7 +46,8 @@ export function FileDropzone({ onFile }: Props) {
         Wybierz plik PDF
       </button>
       <p id={hintId} className="dropzone__hint">
-        Format PDF z warstwą tekstową, maksymalnie {MB} MB.
+        <span className="tag">Maks. {MB} MB</span> Format PDF z warstwą tekstową. Plik nie opuszcza
+        przeglądarki.
       </p>
       <input
         ref={inputRef}
@@ -57,6 +62,6 @@ export function FileDropzone({ onFile }: Props) {
           if (file) onFile(file);
         }}
       />
-    </div>
+    </section>
   );
 }

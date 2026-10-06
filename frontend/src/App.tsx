@@ -1,23 +1,40 @@
 import { FileDropzone } from './components/FileDropzone';
+import { FlowSteps } from './components/FlowSteps';
 import { ResultView } from './components/ResultView';
 import { AnalyzingStatus, ErrorPanel, ReadingStatus, ReadyPanel } from './components/StatusPanels';
+import { flowSteps } from './lib/flowSteps';
 import { AI_NOTICE } from './lib/messages';
 import { useAnalysisFlow } from './lib/useAnalysisFlow';
 
 export function App() {
   const { state, selectFile, start, cancel, reset } = useAnalysisFlow();
+  const steps = flowSteps(state);
+  const current = steps.find((step) => step.current);
 
   return (
     <div className="page">
       <header className="masthead">
-        <h1>PDF Insight</h1>
-        <p>Podsumowanie i dane strukturalne z dokumentu PDF.</p>
+        <span className="masthead__digit" aria-hidden="true">
+          {current?.number ?? '04'}
+        </span>
+        <p className="label label--accent label--rule">Analiza dokumentów</p>
+        <h1 className="masthead__title">PDF Insight</h1>
+        <p className="masthead__lead">
+          Wgraj plik PDF, a otrzymasz <strong>krótkie podsumowanie</strong> i{' '}
+          <strong>uporządkowane dane</strong>: kwoty, daty, podmioty i słowa kluczowe — gotowe do
+          pobrania jako JSON.
+        </p>
       </header>
 
+      <FlowSteps steps={steps} />
+
       <main id="main" className="content">
-        <p className="notice" role="note">
-          <strong>Informacja o danych:</strong> {AI_NOTICE}
-        </p>
+        <section className="notice" role="note" aria-labelledby="notice-title">
+          <p id="notice-title" className="label label--accent">
+            Informacja o danych
+          </p>
+          <p className="notice__text">{AI_NOTICE}</p>
+        </section>
 
         <div aria-live="polite" className="visually-hidden">
           {state.phase === 'analyzing' && 'Trwa analiza dokumentu.'}
@@ -61,7 +78,10 @@ export function App() {
       </main>
 
       <footer className="footer">
-        Wyniki generuje model AI i mogą zawierać błędy — sprawdź kluczowe informacje w dokumencie.
+        <p>
+          Wyniki generuje model AI i mogą zawierać błędy — sprawdź kluczowe informacje w dokumencie.
+        </p>
+        <p className="label">PDF Insight // analiza dokumentów</p>
       </footer>
     </div>
   );
