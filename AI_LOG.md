@@ -531,3 +531,22 @@ extraction schema, truncated at 2048 tokens; no compact-mode Gemma trial recorde
 model card exists. Prepared NEXT_MODEL_COMPACT.md for one bounded compact comparison, conditional
 adapter/deployment only after both existing evaluation cases pass. CPU risk remains separate.
 No inference, model switch or deployment by Codex.
+
+## 2026-10-06 — Compact model comparison: Gemma 4 (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/NEXT_MODEL_COMPACT.md. Проверь Gemma на compact:
+сначала договор, затем при успехе оферту. Сохрани проверки качества. Только если оба документа
+проходят — перенеси адаптер в TS и проверь публичное демо. Соблюдай бюджет вызовов и лимит
+работы около 40 минут. При неудаче оставь текущую модель и останови эксперименты.»
+
+- 12:26–12:29: no-inference checks — catalogue + schema (identical to 2026-10-05), emitted request
+  options of the existing Python profile, offline oracle on both cases. First `wrangler ai models
+  --schema` attempt used a wrong flag (now `ai models schema`). The dev server's `tee` log stayed
+  empty, so server log lines were taken from the preview logs (as for run J).
+- Local overrides only: `AI_MODEL` in `.dev.vars` and an uncommitted diagnostic print (response
+  shape, usage, finish reason, raw content → local stdout) to settle the run-B truncation question.
+- R (contract): 1 call, 18.5 s, 71/71, AI-assisted source review pass → accepted.
+- S (offer): 1 call, 15.4 s, 70/73 — rejected variant B not selected → failed. Stopped as
+  instructed: no TS adapter, no deploy, 70B kept. 2 of 4 calls. Overrides removed, tree clean
+  (12:32). Docs only in this commit.
+

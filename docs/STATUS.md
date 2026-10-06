@@ -1,6 +1,6 @@
-# Current snapshot — 2026-10-06, 12:20 Warsaw (CPU check)
+# Current snapshot — 2026-10-06, 12:35 Warsaw (compact model comparison)
 
-Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 24 min left).
+Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 09 min left).
 
 | Item | State |
 |---|---|
@@ -8,6 +8,7 @@ Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 24 min left)
 | Backend | TypeScript Worker `pdf-insight-api`, version `d7e5ae75-a043-45c7-8f7f-2ecac09e9d74` (app code `17593aa`); rollback targets: TS `dd6a5db2-5c7d-4b1f-b037-b8608459087e`, Python `a4695cc8-ac6c-47a9-9253-6facf931c2b9` |
 | Public sample analyses on TS | P (`dd6a5db2`): 26.5 s, CPU 37 ms, accepted. **Q (`d7e5ae75`): 30.7 s upload-to-render — over the 30 s target**, CPU 39 ms, 70/71 (only latency failed), AI review pass |
 | Analysis CPU vs Free 10 ms | **not met**: 37 ms and 39 ms observed (both the first analysis after a deploy); non-AI requests 0–5 ms; no resource-limit errors |
+| Model comparison (local, compact-v4) | Gemma 4 26B: contract R accepted (18.5 s, 71/71), offer S **failed** (omitted the rejected bid, 70/73) → experiment stopped, **70B stays in production**, no adapter port or deploy (below) |
 | Checks | worker 169 tests (89 parity + 66 phrase-equivalence + 14 behaviour), backend 444, frontend 107 |
 
 Requirements (IDs as in docs/PLAN.md):
@@ -24,6 +25,27 @@ Requirements (IDs as in docs/PLAN.md):
 | F-08 | Long documents (SHOULD) | **no** | no |
 | F-09 | Local history (SHOULD) | yes | yes |
 | F-10 | OCR (COULD) | **no** | no |
+
+## Compact model comparison (docs/NEXT_MODEL_COMPACT.md)
+
+Local `pywrangler dev` with the real AI binding; `AI_MODEL=@cf/google/gemma-4-26b-a4b-it` only as
+a git-ignored `.dev.vars` override; compact-v4 prompt, schema, limits, `max_tokens` 2048 and
+timeouts unchanged; existing Python profile (OpenAI-style `json_schema` with `strict`,
+`chat_template_kwargs.enable_thinking=false`) verified offline before the calls. Catalogue entry and
+input/output schema re-read at 12:27 (no inference): identical to the 2026-10-05 copy; reasoning
+is on by default and switchable.
+
+| Run | Case | Calls | Tokens in / out | finish_reason | Local time | eval-v6 | Verdict |
+|---|---|---|---|---|---|---|---|
+| R | sample contract | 1 | 9 581 / 1 180 | stop | 18.5 s | 71/71 + AI review pass | **accepted** |
+| S | synthetic offer | 1 | 1 794 / 590 | stop | 15.4 s | **70/73** | **failed** — rejected variant B (141 500 zł netto) not selected although it was a candidate with a correct context |
+
+Result: one of two documents fails on a required fact → model experiment stopped as instructed;
+production stays on the 70B; steps 4–5 (TS adapter, deploy, public run) not started. 2 of 4
+allowed calls used (151.7 neurons reported). The run-B truncation (old full schema) did not
+reproduce on compact: no reasoning fields or reasoning-token usage, `stop`, output well below the
+cap; its original cause stays unconfirmed. Local overrides and a temporary diagnostic print were
+removed (clean tree). Details: docs/LIVE_AI_RESULTS.md.
 
 ## CPU check (docs/NEXT_CPU_CHECK.md)
 

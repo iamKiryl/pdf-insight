@@ -670,3 +670,51 @@ exported result, evaluation, review; raw tail kept local only). The same documen
 Status: **failed** (latency over 30 s), quality unchanged. Not repeated (one analysis per
 checkpoint). Correction: runs P and Q used a headless Chrome left over from run L (anonymous
 scratch profile, not fresh); measurements unaffected. Evidence: `.local/live/deployed/Q-ts-cpu-fix/`.
+
+# Compact model comparison — 2026-10-06 (docs/NEXT_MODEL_COMPACT.md)
+
+Local `pywrangler dev`, real AI binding, Workers Free (no payment method). Model override
+`@cf/google/gemma-4-26b-a4b-it` only in the git-ignored `backend/.dev.vars`; production untouched.
+Everything else unchanged: prompt compact-v4-2026-10-06, output schema, candidate limits,
+`max_tokens` 2048, 40 s / 55 s timeouts, one correction at most, eval-v6.
+
+Before the calls (no inference): catalogue and model schema re-read 12:27 Warsaw — identical to the
+2026-10-05 copy; `chat_template_kwargs.enable_thinking` defaults to true; output has
+`choices[].finish_reason` and optional `usage.completion_tokens_details.reasoning_tokens`. Emitted
+request checked offline: keys `messages, response_format, max_tokens, temperature,
+chat_template_kwargs`; `response_format = {type: json_schema, json_schema: {name, schema, strict:
+true}}` with the unchanged compact schema; `enable_thinking=false`. Offline oracle (exact expected
+candidates, production assembly): sample 70/70, offer 73/73. Quota by own accounting ≈ 3 100 of
+10 000 neurons used today before the calls (actual usage not readable).
+
+| Run | Case | Calls started / completed | Tokens in / out (neurons reported) | finish_reason | Server / client | eval-v6 | Status |
+|---|---|---|---|---|---|---|---|
+| R | sample contract (12 p.) | 1 / 1 | 9 581 / 1 180 (119.3) | stop | 18.49 / 18.53 s | 71/71; AI-assisted review (Claude) pass | **accepted** |
+| S | synthetic offer (4 p.) | 1 / 1 | 1 794 / 590 (32.4) | stop | 15.41 / 15.45 s | **70/73** | **failed** |
+
+- **R:** 76 amounts and 38 dates identical (value, currency/date, exact context) to the reviewed
+  70B run J; title copied exactly from page 1; 9 people, all exactly as in the source (adds the
+  invoice issuer); 5 key points and a 3-sentence summary, every fact checked against the source
+  (term, 12-month extension, 99,5 % SLA, 30 % advance within 14 days, 0,2 %/day penalty). No
+  injection content.
+- **S:** the required rejected variant B, 141 500,00 zł netto (p. 2), was offered as candidate 13
+  with its "odrzucony" context and **not selected** — a model omission. All stated facts are
+  grounded (118 080,00 zł brutto, 1 450 EUR netto/month, 28 800,00 zł advance, dates, penalty and
+  cap, warranty); the page-3 injection candidate (0 EUR) was correctly ignored. No correction call
+  (the output was schema-valid).
+- **Truncation question:** on compact both responses ended with `stop`, contained only `content`
+  and `role` (no reasoning field, no reasoning-token usage) and stayed far below the 2 048 cap
+  (pretty-printed JSON, one ID per line). Run B's truncation on the old full schema was not
+  reproduced; whether it was repetition or reasoning remains unestablished (its content was never
+  logged).
+- **Decision (per the task):** one document failed on a required fact → model experimentation
+  stopped. The 70B stays in production; no TS adapter port, frontend disclosure change, deploy or
+  public run. A faster model is not a substitute for a dropped fact, and the evaluator was not
+  changed. The latency risk of the 70B (P 26.5 s, Q 30.7 s public) remains as recorded.
+
+Calls: 2 of the 4 allowed (no third). Day accounting ≈ 3 270 neurons, actual usage unknown.
+Local overrides restored (`.dev.vars` equals the example again) and a temporary, uncommitted
+diagnostic print (response shape, usage, finish reason, raw content to local stdout only) removed.
+Evidence (git-ignored): `.local/live/tuning/R-gemma4-compact-sample/`,
+`.local/live/tuning/S-gemma4-compact-offer/` (request/response, meta, evaluator reports, server log
+lines, response-structure diagnostics, review files).
