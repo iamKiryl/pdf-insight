@@ -95,3 +95,26 @@ def test_mixed_name_twice_fails_after_two_calls_without_silent_dropping():
     assert response.json()["error"]["code"] == "AI_INVALID_OUTPUT"
     assert len(ai.calls) == 2
     assert json.dumps(response.json()).count("Kowalski") == 0
+
+
+# ------------------------------------------------------------------ marker leak (live run H)
+
+
+def test_marker_copied_before_its_value_is_removed_from_text():
+    by_id = {c.id: c for c in extract_candidates(REQUEST)}
+    body = selection_payload([])
+    body["summary"] = ("Umowa jest ważna do dnia ⟦D3⟧31 października 2026 roku. Cena wynosi "
+                       "⟦A5⟧ 96 000,00 zł netto. Strony podpisały umowę.")  # fmt: skip
+    body["keyPoints"] = ["Kara wynosi ⟦A16⟧400,00 zł.", "Drugi punkt.", "Trzeci punkt."]
+    output = parse_selection(body, by_id, REQUEST).output
+    assert "⟦" not in output.summary and "31 października" in output.summary
+    assert output.keyPoints[0] == "Kara wynosi 400,00 zł."
+
+
+def test_marker_standing_in_for_a_value_is_invalid_output():
+    by_id = {c.id: c for c in extract_candidates(REQUEST)}
+    body = selection_payload([])
+    body["keyPoints"] = ["Cena wynosi ⟦A5⟧.", "Drugi punkt.", "Trzeci punkt."]
+    with pytest.raises(InvalidModelOutput) as info:
+        parse_selection(body, by_id, REQUEST)
+    assert info.value.problems == ["keyPoints.0: contains an internal marker; write plain text"]

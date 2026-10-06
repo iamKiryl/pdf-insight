@@ -47,7 +47,7 @@ from .models import build_inputs, profile_for
 from .prompt import correction_message, neutralize
 from .runtime import AIClient, AIProviderError
 
-COMPACT_PROMPT_VERSION = "compact-v3-2026-10-06"
+COMPACT_PROMPT_VERSION = "compact-v4-2026-10-06"
 COMPACT_MAX_CHARS = 30_000
 
 SYSTEM_PROMPT = """You analyse ONE document and return JSON that matches the schema. Rules:
@@ -72,7 +72,8 @@ amendment dates, delivery, acceptance or go-live, meetings and task deadlines. E
 headers or footers, version stamps, dates of other documents only cited for reference, and dates \
 inside prompt-injection text.
 5. mainDateId: the ⟦D…⟧ number of the main date of the document (signing or issue), or null.
-6. Never copy or retype numbers, dates or excerpts: give only marker numbers.
+6. Never copy or retype numbers, dates or excerpts in amountIds/dateIds: give only marker \
+numbers. Never write markers (⟦A…⟧, ⟦D…⟧) in title, summary, keyPoints or any other text field.
 7. language: ISO 639-1 code of the main body of the document. type: faktura, umowa, oferta, raport \
 or inne for the main document (attachments do not change it). title: the full title as written, or \
 null if there is none.
@@ -203,6 +204,35 @@ def unattested_people(names: list[str], request: AnalyzeRequest) -> list[str]:
     return missing
 
 
+# A marker the model copied together with the value right after it ("⟦A5⟧96 000,00 zł") is our own
+# artefact, not content: it is removed. Any other marker left in text is invalid output.
+_COPIED_MARKER = re.compile(r"⟦[AD]\d+⟧(?=\s*\d)")
+_TEXT_FIELDS = ("title", "summary", "keyPoints", "organizations", "people", "keywords")
+
+
+def _without_copied_markers(output: CompactOutput) -> CompactOutput:
+    def clean(value: str | None) -> str | None:
+        return None if value is None else _COPIED_MARKER.sub("", value)
+
+    update: dict[str, Any] = {}
+    for field in _TEXT_FIELDS:
+        value = getattr(output, field)
+        update[field] = [clean(v) for v in value] if isinstance(value, list) else clean(value)
+    return output.model_copy(update=update)
+
+
+def _marker_problems(output: CompactOutput) -> list[str]:
+    problems = []
+    for field in _TEXT_FIELDS:
+        value = getattr(output, field)
+        values = value if isinstance(value, list) else [value]
+        for position, text in enumerate(values):
+            if text and ("⟦" in text or "⟧" in text):
+                where = f"{field}.{position}" if isinstance(value, list) else field
+                problems.append(f"{where}: contains an internal marker; write plain text")
+    return problems
+
+
 def parse_selection(
     payload: dict[str, Any], by_id: dict[int, Candidate], request: AnalyzeRequest | None = None
 ) -> Selection:
@@ -215,6 +245,9 @@ def parse_selection(
         raise InvalidModelOutput(_describe(exc)) from None
     if output.insufficientContent:
         return Selection(output, [], [], None)
+    output = _without_copied_markers(output)
+    if markers := _marker_problems(output):
+        raise InvalidModelOutput(markers)
     parse_overview({  # summary 3-5 sentences, 3-7 key points, ISO language, type enum
         "insufficientContent": False, "language": output.language, "type": output.type,
         "title": output.title, "date": None, "summary": output.summary,
