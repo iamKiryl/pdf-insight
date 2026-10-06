@@ -648,3 +648,15 @@ request returns 6002 "Model schema not found"; only `@cf/meta/llama-3.1-8b-instr
 already shown incompatible with JSON Schema (runs N/N2). The experiment is blocked: **0 provider
 calls** in this checkpoint (separate from N/N2), no other model tried, no public sample run.
 The TS Worker migration was verified offline only (parity and fake-AI profiling).
+
+# TS deployment checkpoint — 2026-10-06 (docs/REVIEW_TS_DEPLOY.md)
+
+| Run | Where | Calls (observed) | Result |
+|---|---|---|---|
+| P — sample contract | public demo → TS Worker `dd6a5db2` | 1 started, 1 completed; 9 894 / 764 tokens (`wrangler tail`) | **200**; upload-to-render 26.5 s (read 0.53 s, analysis 26.0 s); Worker wall 25.8 s, **CPU 37 ms**; eval-v6 71/71; AI-assisted review (Claude) pass → accepted |
+
+Prompt `compact-v4-2026-10-06`, same model and limits as before. Page-11 warning shown; JSON export
+identical to the preview; history reopen after reload made 0 API requests; 360 px without
+horizontal scroll. Evidence: `.local/live/deployed/P-ts-public-sample/` (numeric tail summary,
+exported result, evaluation, review; raw tail kept local only). The same document took 26.1 s (J),
+≈ 25 s (K) and timed out once at 40 s (L, Python runtime): latency is model-bound and variable.

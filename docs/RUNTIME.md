@@ -1,45 +1,45 @@
-# Backend runtime: Python Worker (deployed) and TypeScript Worker (candidate)
+# Backend runtime
 
-2026-10-06. Decision source: docs/NEXT_FREE_RUNTIME.md.
+## Current state (2026-10-06, 12:05 Warsaw)
 
-| | Python Worker `backend/` | TypeScript Worker `worker/` |
+| | TypeScript Worker `worker/` | Python Worker `backend/` |
 |---|---|---|
-| Status | **deployed** (`pdf-insight-api`, version `a4695cc8`, from `c775866`) | candidate, **not deployed** |
-| Modes | compact (deployed), single, chunked (experiments) | compact only |
-| API, errors, bindings, model | reference | identical (parity tests against Python golden files) |
-| CPU evidence | Cloudflare: health 6–18 ms, invalid full-size request 16–49 ms, analyze 303 ms (timeout run); local workerd pipeline 23.5 ms after memo | local workerd: full request ≈ 4.2 ms warm, 42 ms first POST; **Cloudflare CPU not measured** |
-| Bundle | 8 985 KiB / 2 234 KiB gzip | 1 077 KiB / 149 KiB gzip |
+| Status | **deployed** as `pdf-insight-api`, version `dd6a5db2-5c7d-4b1f-b037-b8608459087e` (12:00 Warsaw), application code from `191a1d8` (reviewed at `974d77d`) | previous production version `a4695cc8-ac6c-47a9-9253-6facf931c2b9` (from `c775866`), kept for exact rollback; reference implementation and evaluation tooling |
+| Modes | compact only | compact, single, chunked (experiments) |
+| Bundle / reported startup | 1 077 KiB / 149 KiB gzip, 30 ms | 8 985 KiB / 2 234 KiB gzip, 2 325 ms |
+| Cloudflare CPU, health | 0–1 ms | 6–18 ms |
+| Cloudflare CPU, full-size invalid request (no AI) | 5 ms (two requests) | 16 / 29 / 49 ms |
+| Cloudflare CPU, sample analysis | **37 ms** (public run P, first analysis after deploy, wall 25.8 s) | 303 ms (public run L, AI timeout) |
+| Local workerd, warm full request (fake AI) | ≈ 4.2 ms | pipeline only 23.5 ms |
 
-## Intended replacement (only after review)
+CPU values come from `wrangler tail` (one event each; cold/warm isolate state not controlled).
+The Free plan documents 10 ms CPU per request and tolerates occasional overruns: the TS analysis
+(37 ms) is far below Python but **still above 10 ms**; no resource-limit error was observed.
 
-The TS config (`worker/wrangler.jsonc`) uses the same Worker name `pdf-insight-api`, the same
-`AI` binding, the same rate-limit namespaces (41001, 41002), production fail-closed vars, the
-Pages-only origin and the 70B model. Deploying it REPLACES the Python runtime at the same URL:
+## Deploy (TS, the current runtime)
 
 ```bash
 cd worker
 npm ci && npm run typecheck && npm test
-npx wrangler deploy            # replaces pdf-insight-api with the TS runtime
+npx wrangler deploy --config wrangler.jsonc     # pdf-insight-api, same bindings and model
 ```
 
-Verify afterwards without model calls: `GET /api/health` (expects `"mode":"compact"`), foreign
-origin 403, Pages preflight 204; then measure CPU with `npx wrangler tail pdf-insight-api --format json`
-on health and an invalid full-size request before any analysis.
+Verify without AI: `GET /api/health`, Pages preflight 204, foreign origin 403, and
+`npx wrangler tail pdf-insight-api --format json` for `scriptVersion` and the `"runtime":"ts"`
+log field (health looks identical for both runtimes).
 
-## Rollback / Python fallback (explicit, separate)
+## Rollback
 
-```bash
-cd backend
-uv run pywrangler deploy       # redeploys the Python runtime to the same Worker name
-# or, for an exact previous version:
-npx wrangler rollback          # choose the Python version, e.g. a4695cc8-ac6c-47a9-9253-6facf931c2b9
-```
-
-Never run a generic `wrangler deploy` from the repository root: there is no root config, and the
-two runtime directories are deliberately separate so a command cannot pick the wrong one.
+- **Exact previous version (recommended):**
+  `cd worker && npx wrangler rollback a4695cc8-ac6c-47a9-9253-6facf931c2b9 --name pdf-insight-api`
+  restores the recorded Python deployment byte for byte (its bindings and vars included).
+- `cd backend && uv run pywrangler deploy` deploys the **current** Python code and config from the
+  working tree — not the old exact version. Use it only for a deliberate Python release.
+- There is no root Wrangler config: run deploy commands only inside `worker/` or `backend/`; the
+  local profiling configs (`wrangler.profile.jsonc`) must never be deployed.
 
 ## CI
 
-`.github/workflows/ci.yml` job "TS Worker typecheck, parity tests and bundle" (no credentials,
-`--dry-run` only) runs alongside the frontend and Python jobs; the Pages build waits for all of
-them. Python evaluation and parity-freshness tests stay in the backend job.
+`.github/workflows/ci.yml` runs frontend, Python and TS Worker checks (TS: typecheck, 103 tests
+with fake bindings and Python golden parity files, `--dry-run` bundle). Deployment of the Worker
+is manual (above); Pages deploys from the workflow dispatch with `deploy=true`.

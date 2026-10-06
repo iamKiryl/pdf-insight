@@ -482,3 +482,19 @@ No blocker found in reviewed paths. Clarified parity compares rejection field pa
 is absent from CI, remote cancellation is not proven by Promise.race, and exact rollback needs a
 recorded version. Prepared REVIEW_TS_DEPLOY.md for controlled deployment and one quota-bounded
 public sample run. Codex made no AI calls or deployment.
+
+## 2026-10-06 — TS backend deployed and verified (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_TS_DEPLOY.md. Замени существующий backend
+проверенным TS Worker, сохрани точную версию для отката. Проверь транспорт и CPU без AI, затем
+выполни один анализ договора через публичное демо — максимум два вызова модели с учётом коррекции.
+Зафиксируй качество, время, CPU и оставшиеся ограничения.»
+
+- Recorded rollback version `a4695cc8-ac6c-47a9-9253-6facf931c2b9`; re-ran worker checks; deployed
+  `worker/wrangler.jsonc` → `dd6a5db2-5c7d-4b1f-b037-b8608459087e` (startup 30 ms).
+- No-AI checks with numeric tail summaries: health 0–1 ms CPU, invalid full-size request 5 ms,
+  CORS allow/deny correct, `runtime: ts` and script version confirmed.
+- Fixed Claude's own public-run script (it crashed on export after the earlier timeout) before use.
+- One public analysis: 26.5 s, 1 call, 37 ms CPU, 71/71, review pass (Claude, AI). No retries.
+- RUNTIME rollback instructions corrected: exact rollback by version id; `pywrangler deploy`
+  deploys current Python code, not the old version.

@@ -1,29 +1,39 @@
-# Current snapshot — 2026-10-06, 11:55 Warsaw (free runtime checkpoint)
+# Current snapshot — 2026-10-06, 12:05 Warsaw (TS backend deployed)
 
-Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 50 min left at this snapshot).
+Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 40 min left).
 
 | Item | State |
 |---|---|
-| Public demo | https://iamkiryl.github.io/pdf-insight/ — frontend from `54515a5` (CI run https://github.com/iamKiryl/pdf-insight/actions/runs/37445769851, includes the storage-full history fix) |
-| Backend (deployed) | Python Worker `pdf-insight-api`, version `a4695cc8` from `c775866`, 70B compact — **unchanged** |
-| Backend candidate | TypeScript Worker `worker/` (`191a1d8`), parity with Python, **not deployed** (docs/RUNTIME.md) |
-| Checks | frontend 107 Vitest + lint/format/typecheck/build; backend 444 pytest + Ruff; worker 103 Vitest + typecheck + bundle; all green in CI run 37445598624 |
-| Public acceptance | **not achieved**: the one public analysis (run L) timed out; Free CPU not verified for the deployed runtime |
+| Public demo | https://iamkiryl.github.io/pdf-insight/ — frontend from `54515a5` (CI run 37445769851) |
+| Backend | **TypeScript Worker** `pdf-insight-api`, version `dd6a5db2-5c7d-4b1f-b037-b8608459087e`, application code `191a1d8`; exact rollback target Python `a4695cc8-ac6c-47a9-9253-6facf931c2b9` (docs/RUNTIME.md) |
+| Public sample analysis (run P) | **succeeded**: upload-to-render 26.5 s (< 30 s), 1 model call, 9 894 / 764 tokens, eval-v6 71/71, AI-assisted source review pass (status accepted), page-11 warning, export identical, history reopen with 0 requests |
+| Worker CPU (Cloudflare, `wrangler tail`) | health 0–1 ms, invalid full-size request 5 ms, analysis **37 ms** (vs Python 6–18 / 16–49 / 303 ms); above the documented Free 10 ms per request, no resource-limit errors |
+| Checks | frontend 107, backend 444, worker 103 tests; CI green |
 
 Requirements (IDs as in docs/PLAN.md):
 
 | ID | Requirement | Code complete | Accepted on the public demo |
 |---|---|---|---|
-| F-01 | Drag & drop / chooser, PDF ≤ 10 MB | yes | yes (anonymous checks 2026-10-06) |
-| F-02 | Text layer extraction, pages without text | yes | yes (pdf.js worker, page 11 detected) |
-| F-03 | 3–5 sentence factual summary in the document language | yes (compact, 70B) | **no** — accepted locally (I, J) and via deployed backend + local frontend (K); public run L timed out |
-| F-04 | Structured data strictly by schema, one retry on invalid output | yes (Python deployed; TS candidate with parity) | partially — schema/validation verified; no successful public analysis |
-| F-05 | Readable result, JSON view and .json download | yes | yes for reopened history data (identical export); no fresh public analysis |
-| F-06 | Empty, loading, error and retry states | yes | yes (non-PDF error, AI timeout message with retry) |
-| F-07 | Public GitHub Pages demo | published | **not accepted** until a public analysis succeeds within the target |
-| F-08 | Long documents: chunking and merge (SHOULD) | **no** — compact rejects > 30 000 characters (explicit 413); chunked unvalidated | no |
-| F-09 | Local history (SHOULD) | yes (`abe5a21`, `127274b`) | yes (reopen/export without request; fix published in `54515a5`) |
-| F-10 | OCR (COULD) | **no** (warning only) | no |
+| F-01 | Drag & drop / chooser, PDF ≤ 10 MB | yes | yes |
+| F-02 | Text layer extraction, pages without text | yes | yes |
+| F-03 | 3–5 sentence factual summary in the document language | yes | yes for public run P (one success; run L timed out on the Python runtime) |
+| F-04 | Strict schema, one retry on invalid output | yes (TS deployed, parity with Python) | yes for run P (valid on the first call; correction path tested offline) |
+| F-05 | Readable result, JSON view and .json download | yes | yes (export identical to preview) |
+| F-06 | Empty, loading, error and retry states | yes | yes |
+| F-07 | Public GitHub Pages demo | yes | **conditionally**: one public success within 30 s; reliability not established (latency 25–26 s, one earlier 40 s timeout) and CPU 37 ms above the documented Free limit |
+| F-08 | Long documents (SHOULD) | **no** (compact rejects > 30 000 characters) | no |
+| F-09 | Local history (SHOULD) | yes | yes |
+| F-10 | OCR (COULD) | **no** | no |
+
+## TS deployment checkpoint (docs/REVIEW_TS_DEPLOY.md)
+
+Before mutation: deployed version `a4695cc8-ac6c-47a9-9253-6facf931c2b9` recorded; worker code
+unchanged since review; 103 tests and typecheck re-run. Deployed from `worker/wrangler.jsonc`.
+Transport without AI: health 200 (`production`, AI and limiters bound), Pages preflight 204 with
+the origin header, foreign origin 403, localhost 403, two full-size invalid requests 400; every
+event carried `scriptVersion dd6a5db2…`, analyze events `"runtime":"ts"`, no exceptions.
+One public analysis via headless Chrome (fresh profile, real file input) — see run P above and
+docs/LIVE_AI_RESULTS.md. One success is not a reliability guarantee; the 70B latency risk remains.
 
 ## Free runtime checkpoint (docs/NEXT_FREE_RUNTIME.md)
 
