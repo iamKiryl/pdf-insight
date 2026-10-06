@@ -19,7 +19,16 @@ def log_event(**fields: object) -> None:
 
 
 CALL_FIELDS = frozenset(
-    {"label", "attempt", "outcome", "ms", "promptTokens", "completionTokens", "finishReason"}
+    {
+        "label",
+        "attempt",
+        "outcome",
+        "ms",
+        "promptTokens",
+        "completionTokens",
+        "finishReason",
+        "outputBytes",
+    }
 )
 MAX_PROBLEMS = 10
 

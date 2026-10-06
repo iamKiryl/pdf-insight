@@ -66,6 +66,10 @@ def test_limits_mirror_contract():
     assert limits["chunkOverlapChars"] == chunking.CHUNK_OVERLAP_CHARS
     assert limits["maxChunks"] == chunking.MAX_CHUNKS
     assert limits["maxConcurrentModelCalls"] == chunked.MAX_CONCURRENT_CALLS
+    from pdf_insight import candidates, compact
+
+    assert limits["compactMaxChars"] == compact.COMPACT_MAX_CHARS
+    assert limits["maxCandidates"] == candidates.MAX_CANDIDATES
     assert limits["minTotalLetters"] == contract.MIN_TOTAL_LETTERS
     assert tuple(limits["summarySentences"]) == contract.SUMMARY_SENTENCES
     assert tuple(limits["keyPoints"]) == contract.KEY_POINTS

@@ -25,6 +25,12 @@ ERRORS: dict[str, ErrorSpec] = {
         False,
     ),
     "UNSUPPORTED_MEDIA_TYPE": ErrorSpec(415, "Nieobsługiwany format żądania.", False),
+    "TOO_MANY_CANDIDATES": ErrorSpec(
+        422,
+        "Dokument zawiera zbyt wiele kwot i dat, aby przeanalizować go w tym trybie. "
+        "Nic nie zostało pominięte — użyj krótszego dokumentu.",
+        False,
+    ),
     "NO_TEXT_LAYER": ErrorSpec(
         422,
         "Dokument nie zawiera warstwy tekstowej (prawdopodobnie jest skanem). "

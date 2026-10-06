@@ -10,6 +10,8 @@
   "chunkOverlapChars": 300,
   "maxChunks": 8,
   "maxConcurrentModelCalls": 2,
+  "compactMaxChars": 30000,
+  "maxCandidates": 400,
   "minTotalLetters": 200,
   "summarySentences": [3, 5],
   "keyPoints": [3, 7],

@@ -9,7 +9,9 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from .analyzer import ModelUsage, analyze
+from .chunk_prompt import CHUNK_PROMPT_VERSION
 from .chunked import ChunkedStats, analyze_chunked
+from .compact import COMPACT_MAX_CHARS, COMPACT_PROMPT_VERSION, analyze_compact
 from .config import Settings
 from .contract import MAX_TOTAL_CHARS, MIN_TOTAL_LETTERS, SINGLE_CALL_MAX_CHARS, AnalyzeRequest
 from .errors import ApiError
@@ -47,7 +49,9 @@ def _parse_request(body: bytes, settings: Settings) -> AnalyzeRequest:
         request = AnalyzeRequest.model_validate(data)
     except ValidationError:
         raise ApiError("INVALID_REQUEST") from None
-    limit = SINGLE_CALL_MAX_CHARS if settings.ai_mode == "single" else MAX_TOTAL_CHARS
+    limit = {"single": SINGLE_CALL_MAX_CHARS, "compact": COMPACT_MAX_CHARS}.get(
+        settings.ai_mode, MAX_TOTAL_CHARS
+    )
     if request.total_chars > limit:
         raise ApiError("DOCUMENT_TOO_LONG")  # explicit; text is never truncated
     if len(request.pagesWithoutText) == request.pageCount:
@@ -89,7 +93,10 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
         fields: dict[str, Any] = {
             "event": "analyze",
             "model": runtime.settings.ai_model,
-            "promptVersion": PROMPT_VERSION,
+            "promptVersion": {
+                "compact": COMPACT_PROMPT_VERSION,
+                "chunked": CHUNK_PROMPT_VERSION,
+            }.get(runtime.settings.ai_mode, PROMPT_VERSION),
         }
         usage = ModelUsage()
         chunk = ChunkedStats()
@@ -106,6 +113,8 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
                 raise ApiError("SERVICE_MISCONFIGURED")
             if runtime.settings.ai_mode == "chunked":
                 outcome = await analyze_chunked(parsed, runtime.ai, runtime.settings, usage, chunk)
+            elif runtime.settings.ai_mode == "compact":
+                outcome = await analyze_compact(parsed, runtime.ai, runtime.settings, usage)
             else:
                 outcome = await analyze(parsed, runtime.ai, runtime.settings, usage)
         except ApiError as exc:

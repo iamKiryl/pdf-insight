@@ -16,6 +16,7 @@ plain integers. Supported dates: 2026-03-12, 12.03.2026, 12 marca 2026, 12 March
 March 12, 2026. Anything else is out of scope and simply not matched.
 """
 
+import datetime as dt
 import re
 from dataclasses import dataclass
 from decimal import Decimal
@@ -73,6 +74,7 @@ class AmountToken:
     text: str
     start: int = 0  # offsets of the number in the parsed text
     end: int = 0
+    adjacent_currency: bool = False  # currency from a marker next to the number (not the page)
 
 
 def parse_number(raw: str) -> Decimal:
@@ -113,21 +115,30 @@ def amounts_on_page(page: int, text: str) -> list[AmountToken]:
                 match.group("num"),
                 match.start("num"),
                 match.end("num"),
+                currency is not None,
             )
         )
     return tokens
 
 
-def dates_on_page(text: str) -> set[str]:
-    found = set()
+def date_occurrences(text: str) -> list[tuple[str, int, int]]:
+    """Every calendar-valid date occurrence as (ISO date, start, end), in source order."""
+    found = []
     for pattern, order in _DATES:
         for match in pattern.finditer(text):
             parts = dict(zip(order, match.groups(), strict=True))
             month = _MONTH_INDEX[parts["M"].lower()] if "M" in parts else int(parts["m"])
             day, year = int(parts["d"]), int(parts["y"])
-            if 1 <= month <= 12 and 1 <= day <= 31:
-                found.add(f"{year:04d}-{month:02d}-{day:02d}")
-    return found
+            try:
+                iso = dt.date(year, month, day).isoformat()
+            except ValueError:
+                continue
+            found.append((iso, match.start(), match.end()))
+    return sorted(found, key=lambda f: f[1])
+
+
+def dates_on_page(text: str) -> set[str]:
+    return {iso for iso, _, _ in date_occurrences(text)}
 
 
 def as_decimal(value: float | int | str) -> Decimal:
