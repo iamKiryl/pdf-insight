@@ -1,4 +1,4 @@
-# PDF Insight API — compact TypeScript Worker (candidate, not deployed)
+# PDF Insight API — compact TypeScript Worker (deployed backend)
 
 Port of the reviewed Python compact path (`backend/src/pdf_insight`) to a thin TypeScript
 Cloudflare Worker, to remove the Python Workers CPU overhead measured on Workers Free

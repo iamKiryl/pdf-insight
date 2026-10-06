@@ -208,14 +208,42 @@ function normalized(text: string): string {
   return collapse(casefold(text.normalize('NFC')));
 }
 
+const WORD_CHAR = /^[\p{L}\p{N}_]$/u;
+
+/** True when `phrase` occurs in `text` with no word character directly before or after — the
+ * same as the regex (?<![\p{L}\p{N}_])phrase(?![\p{L}\p{N}_]) for a literal phrase, without
+ * compiling a Unicode regex per name (measured cold-start hotspot). */
+export function containsWholePhrase(text: string, phrase: string): boolean {
+  for (let at = text.indexOf(phrase); at !== -1; at = text.indexOf(phrase, at + 1)) {
+    const before =
+      at > 0
+        ? String.fromCodePoint(
+            text.codePointAt(at - 1 - (isLowSurrogate(text, at - 1) ? 1 : 0)) ?? 0,
+          )
+        : '';
+    const after =
+      at + phrase.length < text.length
+        ? String.fromCodePoint(text.codePointAt(at + phrase.length) ?? 0)
+        : '';
+    if (!WORD_CHAR.test(before) && !WORD_CHAR.test(after)) return true;
+  }
+  return false;
+}
+
+function isLowSurrogate(text: string, index: number): boolean {
+  const code = text.charCodeAt(index);
+  return index > 0 && code >= 0xdc00 && code <= 0xdfff;
+}
+
 /** Names whose words do not appear consecutively as whole words in one page (no morphology). */
 export function unattestedPeople(names: string[], request: AnalyzeRequest): string[] {
+  if (!names.length) return [];
   const pages = request.pages.map((p) => normalized(p.text));
   return names.filter((name) => {
     const words = pySplit(normalized(name));
     if (!words.length) return false;
-    const pattern = new RegExp(`(?<![${W}])${words.map(escapeRegExp).join(' ')}(?![${W}])`, 'u');
-    return !pages.some((page) => pattern.test(page));
+    const phrase = words.join(' ');
+    return !pages.some((page) => containsWholePhrase(page, phrase));
   });
 }
 

@@ -56,8 +56,17 @@ export const AnalyzeRequestSchema = z
 
 export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
 
+// Computed once per request object (validation and analysis both need it). A WeakMap entry lives
+// only as long as the request object itself, so no document data outlives the request.
+const charCounts = new WeakMap<AnalyzeRequest, number>();
+
 export function totalChars(request: AnalyzeRequest): number {
-  return request.pages.reduce((sum, page) => sum + codePointLength(page.text), 0);
+  let total = charCounts.get(request);
+  if (total === undefined) {
+    total = request.pages.reduce((sum, page) => sum + codePointLength(page.text), 0);
+    charCounts.set(request, total);
+  }
+  return total;
 }
 
 export function totalLetters(request: AnalyzeRequest): number {

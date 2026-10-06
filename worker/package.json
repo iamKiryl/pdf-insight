@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Compact-mode PDF Insight API as a TypeScript Cloudflare Worker (candidate replacement for backend/, not deployed).",
+  "description": "Compact-mode PDF Insight API as a TypeScript Cloudflare Worker \u2014 the deployed backend (pdf-insight-api); the Python Worker in backend/ is the reference implementation.",
   "engines": {
     "node": ">=22"
   },
