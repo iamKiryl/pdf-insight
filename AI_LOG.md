@@ -550,3 +550,11 @@ Prompt (human → Claude, verbatim): «Выполни docs/NEXT_MODEL_COMPACT.md
   instructed: no TS adapter, no deploy, 70B kept. 2 of 4 calls. Overrides removed, tree clean
   (12:32). Docs only in this commit.
 
+
+## 2026-10-06 — Gemma comparison review and OCR scope (Codex)
+
+Read b39774d and run-S evaluation: three failures arise from one omitted rejected variant amount;
+this matches the existing completeness plan and is not waived. No model switch. Prepared
+NEXT_BROWSER_OCR.md for optional local recognition of scanned pages, lazy-loaded, bounded and
+user-reviewed, no AI calls, with actual page-11 transcription verification before deployment.
+CPU and latency risks and F08 remain open. No inference or deployment by Codex.
