@@ -42,6 +42,11 @@ class HistoryStore {
 
   private write(entries: HistoryEntry[]) {
     const outcome = saveHistory(this.storage, entries);
+    if (outcome.status === 'unavailable' && this.storage) {
+      // Nothing could be written: keep showing what is actually stored.
+      this.publish({ ...this.state, status: 'failed' });
+      return;
+    }
     this.publish({ ...this.state, entries: outcome.entries, status: outcome.status });
   }
 
@@ -54,7 +59,12 @@ class HistoryStore {
   };
 
   clear = () => {
-    this.publish({ entries: [], status: clearHistory(this.storage), skipped: 0 });
+    const status = clearHistory(this.storage);
+    if (status !== 'ok' && this.storage) {
+      this.publish({ ...this.state, status: 'failed' });
+      return;
+    }
+    this.publish({ entries: [], status, skipped: 0 });
   };
 }
 

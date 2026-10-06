@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { HISTORY_KEY } from './lib/history';
+import { HISTORY_KEY, createEntry } from './lib/history';
 import { AnalysisResultSchema } from './lib/schema';
 import { acceptedResult } from './test/fixtures';
 
@@ -32,6 +32,7 @@ vi.mock('./api/client', async (importOriginal) => ({
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   localStorage.clear();
 });
 
@@ -50,5 +51,33 @@ describe('saving a finished analysis', () => {
     expect(saved.entries).toHaveLength(1);
     expect(saved.entries[0]?.fileBytes).toBe(4321);
     expect(raw).not.toContain(SOURCE_MARKER);
+  });
+
+  it('with full storage a new analysis still renders and the saved entry is kept', async () => {
+    const old = createEntry(
+      { ...result, document: { ...result.document, title: 'Stara umowa' } },
+      { fileBytes: 100, durationMs: 1000 },
+      new Date(Date.UTC(2026, 9, 5)),
+    );
+    localStorage.setItem(HISTORY_KEY, JSON.stringify({ version: 1, entries: [old] }));
+    const before = localStorage.getItem(HISTORY_KEY);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    render(<App />);
+    expect(screen.getByText('Stara umowa')).toBeTruthy();
+    const pdf = new File(['%PDF-1.7'], 'umowa.pdf', { type: 'application/pdf' });
+    fireEvent.drop(screen.getByRole('region', { name: 'Przeciągnij plik PDF tutaj' }), {
+      dataTransfer: { files: [pdf] },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Analizuj z AI' }));
+    expect(
+      await screen.findByRole('heading', { level: 2, name: result.document.title }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/zapisano w historii na tym urządzeniu/u)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Analizuj inny dokument' }));
+    expect(screen.getByText('Stara umowa')).toBeTruthy();
+    expect(screen.getByText(/Nie udało się zapisać zmiany w historii/u)).toBeTruthy();
+    expect(localStorage.getItem(HISTORY_KEY)).toBe(before);
   });
 });

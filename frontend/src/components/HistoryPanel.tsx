@@ -38,6 +38,12 @@ export function HistoryPanel({ entries, status, skipped, onOpen, onRemove, onCle
           zbyt duże wpisy).
         </p>
       )}
+      {status === 'failed' && (
+        <p className="history__status" role="status">
+          Nie udało się zapisać zmiany w historii — lista pokazuje wpisy, które nadal są zapisane w
+          przeglądarce.
+        </p>
+      )}
       {skipped > 0 && (
         <p className="history__status" role="status">
           Pominięto uszkodzone lub nieaktualne wpisy: {skipped}.

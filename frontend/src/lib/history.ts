@@ -23,7 +23,9 @@ const EntrySchema = z.strictObject({
 const StoredSchema = z.strictObject({ version: z.literal(1), entries: z.array(z.unknown()) });
 
 export type HistoryEntry = z.infer<typeof EntrySchema>;
-export type HistoryStatus = 'ok' | 'unavailable' | 'full';
+/** ok; unavailable (no access); full (quota: oldest/oversize entries not kept); failed (a change
+ * could not be written — the listed entries are still what is stored). */
+export type HistoryStatus = 'ok' | 'unavailable' | 'full' | 'failed';
 
 /** The subset of the Web Storage API used here (tests pass in-memory fakes). */
 export type HistoryStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -35,17 +37,34 @@ export interface LoadedHistory {
   status: HistoryStatus;
 }
 
-/** localStorage if it can actually be written (private modes may expose a throwing object). */
+function isQuotaError(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+  );
+}
+
+/**
+ * localStorage when it can be used. A full storage (the write probe fails with a quota error) is
+ * still returned: saved analyses stay readable, deletable and evictable. Access errors (e.g.
+ * SecurityError in blocked or private modes) mean no history.
+ */
 export function browserStorage(): HistoryStorage | null {
+  let storage: Storage;
   try {
-    const storage = window.localStorage;
-    const probe = `${HISTORY_KEY}.probe`;
-    storage.setItem(probe, '1');
-    storage.removeItem(probe);
-    return storage;
+    storage = window.localStorage;
+    storage.getItem(HISTORY_KEY);
   } catch {
     return null;
   }
+  const probe = `${HISTORY_KEY}.probe`;
+  try {
+    storage.setItem(probe, '1');
+    storage.removeItem(probe);
+  } catch (error) {
+    if (!isQuotaError(error)) return null;
+  }
+  return storage;
 }
 
 function newest(entries: HistoryEntry[]): HistoryEntry[] {
@@ -96,18 +115,29 @@ export interface SaveOutcome {
   status: HistoryStatus;
 }
 
-/** Writes the bounded list; on a quota error drops the oldest entries until it fits. */
+/**
+ * Writes the bounded list; on a quota error drops the oldest entries until it fits. If not even
+ * the newest entry can be written, nothing is removed: the previously stored list stays intact
+ * and the outcome is 'unavailable' (the caller keeps showing what is stored).
+ */
 export function saveHistory(storage: HistoryStorage | null, entries: HistoryEntry[]): SaveOutcome {
   if (!storage) return { entries: [], status: 'unavailable' };
   let kept = boundEntries(entries);
   let trimmed = kept.length < entries.length;
+  if (kept.length === 0) {
+    try {
+      storage.removeItem(HISTORY_KEY);
+      return { entries: [], status: trimmed ? 'full' : 'ok' };
+    } catch {
+      return { entries: [], status: 'unavailable' };
+    }
+  }
   for (;;) {
     try {
-      if (kept.length === 0) storage.removeItem(HISTORY_KEY);
-      else storage.setItem(HISTORY_KEY, serialize(kept));
+      storage.setItem(HISTORY_KEY, serialize(kept));
       return { entries: kept, status: trimmed ? 'full' : 'ok' };
     } catch {
-      if (kept.length === 0) return { entries: [], status: 'unavailable' };
+      if (kept.length <= 1) return { entries: [], status: 'unavailable' };
       kept = kept.slice(0, -1);
       trimmed = true;
     }

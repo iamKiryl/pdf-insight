@@ -131,6 +131,20 @@ describe('local history storage', () => {
     expect(loadHistory(storage).entries).toHaveLength(2);
   });
 
+  it('never removes stored history when not even one entry can be written', () => {
+    const storage = new MemoryStorage();
+    saveHistory(storage, [entry(1), entry(2)]);
+    const before = storage.getItem(HISTORY_KEY);
+    storage.setItem = () => {
+      throw new DOMException('full', 'QuotaExceededError');
+    };
+    expect(saveHistory(storage, [entry(3), entry(1), entry(2)])).toEqual({
+      entries: [],
+      status: 'unavailable',
+    });
+    expect(storage.getItem(HISTORY_KEY)).toBe(before);
+  });
+
   it('clears the stored history', () => {
     const storage = new MemoryStorage();
     saveHistory(storage, [entry(1)]);
