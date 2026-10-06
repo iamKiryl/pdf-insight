@@ -1,3 +1,5 @@
 # Copy to .dev.vars for `uv run pywrangler dev`. No secrets are needed: Workers AI uses the AI binding.
 ENVIRONMENT=development
 ALLOWED_ORIGINS=http://localhost:5173
+# Release mode (as in wrangler.jsonc); "single" is the baseline, "chunked" an experiment.
+AI_MODE=compact

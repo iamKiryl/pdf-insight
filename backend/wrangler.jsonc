@@ -16,13 +16,15 @@
   "vars": {
     // Anything except "development" is treated as production (fail closed).
     "ENVIRONMENT": "production",
-    // Comma-separated browser origins (scheme + host, no path), e.g. https://<user>.github.io
-    "ALLOWED_ORIGINS": "",
+    // Comma-separated browser origins (scheme + host, no path): only the GitHub Pages frontend.
+    "ALLOWED_ORIGINS": "https://iamkiryl.github.io",
     "MAX_BODY_BYTES": "262144",
     "AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-    // "single" (default): one model call. "chunked" / "compact": experiments (docs/CHUNKING.md,
-    // docs/ADR_COMPACT_ANALYSIS.md); not the default until measured on real AI.
-    "AI_MODE": "single",
+    // "compact" — proposed release mode (docs/LIVE_AI_RESULTS.md, runs I and J): code extracts
+    // candidates, one model call selects them; text up to 30 000 characters (longer -> explicit
+    // 413, never truncated). "single" — baseline fallback (one call, up to 48 000 characters,
+    // > 30 s locally). "chunked" — unvalidated experiment (failed its only live trial).
+    "AI_MODE": "compact",
     // Failure ceilings (not a latency target): one model call ≤ 40 s, all calls of a request ≤ 55 s.
     "AI_TIMEOUT_SECONDS": "40",
     "AI_TOTAL_BUDGET_SECONDS": "55",

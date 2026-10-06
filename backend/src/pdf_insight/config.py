@@ -17,7 +17,7 @@ class Settings:
     allowed_origins: frozenset[str]
     max_body_bytes: int
     ai_model: str
-    ai_mode: Mode  # "single" (default) or the experimental "chunked" / "compact"
+    ai_mode: Mode  # code fallback "single"; deployed release config "compact"; "chunked" experiment
     ai_timeout_seconds: float  # ceiling for a single model call
     ai_total_budget_seconds: float  # ceiling for all model calls of one request (incl. retry)
     ai_max_tokens: int
