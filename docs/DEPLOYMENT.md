@@ -10,6 +10,7 @@
 | Production 429 | **observed** by Codex on 2026-10-06 ~06:59 UTC with invalid-body POSTs (no model calls); per-location and eventually consistent, not an exact cap |
 | CPU | TS: health 0–1 ms, invalid full-size 5 ms, analysis 37 ms (P) / 39 ms (Q); earlier Python: 6–18 / 16–49 / 303 ms — above the documented 10 ms Free limit |
 | Public analysis | TS P: 26.5 s, 71/71, accepted; TS Q: 30.7 s (over target), 70/71; earlier Python L: timeout (40 s) |
+| Pending (not deployed) | Optional browser OCR (docs/OCR.md): TS Worker change (`ocrPages`) must be deployed **before** the Pages build; Pages artifact grows by 18 MB (`ocr/`) |
 | Model | 70B kept: the local compact comparison with Gemma 4 failed on the offer (docs/LIVE_AI_RESULTS.md), so nothing was redeployed |
 
 The sections below are dated records of each deployment step.

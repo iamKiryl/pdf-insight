@@ -558,3 +558,25 @@ this matches the existing completeness plan and is not waived. No model switch. 
 NEXT_BROWSER_OCR.md for optional local recognition of scanned pages, lazy-loaded, bounded and
 user-reviewed, no AI calls, with actual page-11 transcription verification before deployment.
 CPU and latency risks and F08 remain open. No inference or deployment by Codex.
+
+## 2026-10-06 — Optional browser OCR (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/NEXT_BROWSER_OCR.md. Добавь опциональный
+браузерный OCR, проверь реальную страницу 11 и синтетический скан. Сохрани обычный анализ,
+отмену, лимиты и предупреждения. Без AI-вызовов; подготовь к ревью, пока не публикуй. Лимит
+работы — около 45 минут.»
+
+- 12:38–13:03. Installed pinned tesseract.js 7.0.0 + `@tesseract.js-data/pol|eng` 1.0.0; checked
+  the installed API (createWorker langs/OEM/options, core variant selection, langPath) before use.
+- Contract change in Python first (reference), then TS; parity goldens regenerated from Python —
+  existing cases unchanged, one new case. A Python log test expected the exact log line and
+  failed on the new `ocrPages` count; expectation updated.
+- Own slips fixed: ran prettier from `worker/` without the project config and reformatted all of
+  `worker/src` → reverted and re-applied only the intended edits; an engine-cleanup callback
+  could terminate the engine being adopted (microtask order) → moved cleanup to the failure
+  path; abort left a hung page promise pending → abort now rejects each step at once (test).
+- Real OCR via headless Chrome (CDP): first sample run used a path with `..` that the file input
+  could not read ("Nie udało się odczytać PDF") → rerun with an absolute path. A headless
+  `--screenshot` Chrome did not exit; killed after the PNG was written.
+- No Workers AI call, no deployment, no publication. Sample OCR text and screenshots in `.local/`.
+

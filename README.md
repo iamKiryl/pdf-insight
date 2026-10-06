@@ -80,7 +80,7 @@ Browser (GitHub Pages, React SPA)                Cloudflare Python Worker (FastA
 | Validation | The raw model JSON is validated first (all requested keys present, strict types), then normalised and validated against the public contract: strict Pydantic (backend) and Zod (frontend) with unknown keys rejected; both run the same fixture files. Exactly one backend retry on invalid model output; the browser never retries on its own. |
 | Summary length | 3–5 sentences checked with a conservative sentence-count interval that handles `sp. z o.o.`, `S.A.`, decimals and initials (see contracts/README.md). |
 | Missing title | Deterministic neutral label in the document language (`Dokument bez tytułu`, `Untitled document`, …) with `analysis.titleFallback = true`. |
-| Scans | Pages without a text layer are listed in `analysis.pagesWithoutText` and shown as a partial-analysis warning; a fully scanned PDF gets an actionable error. No OCR yet. |
+| Scans | Pages without a text layer are listed in `analysis.pagesWithoutText` and shown as a partial-analysis warning; a fully scanned PDF gets an actionable error. **Optional browser OCR (F-10, implemented, not yet published):** on explicit action only, Tesseract.js recognises just those pages in the browser; the user reviews and accepts the text; it is sent with `ocrPages`, marked as OCR in the prompt and returned as `analysis.ocrPages` — see [docs/OCR.md](docs/OCR.md). |
 | Analysis mode | `AI_MODE=compact` (experimental): code extracts candidate amounts/dates with source offsets, one model call selects their IDs, values and contexts are copied from the source (≤ 30 000 chars, ≤ 400 candidates); second trial 23.8 s with all automatic checks passed, but key points copied the summary, so it is still unaccepted (docs/LIVE_AI_RESULTS.md). `AI_MODE=single` (default): one model call, up to 48 000 chars of text. `AI_MODE=chunked` (experimental, F-08): overview call + one call per ≤ 10 000-char chunk (≤ 8), at most 2 in flight, one overall deadline, one retry per request, evidence-grounded deterministic merge, up to 64 000 chars. Not the default until compared on real AI — see [docs/CHUNKING.md](docs/CHUNKING.md). |
 | Body limit | The Workers ASGI adapter buffers the body before FastAPI runs, so the entrypoint rebuilds **every** request first: only `POST /api/analyze` reads its body (rejected from an oversized declared `Content-Length` without reading, otherwise streamed and abandoned after `MAX_BODY_BYTES + 1` bytes); all other paths and methods are forwarded without a body. Middleware enforces the same policy again. |
 | Rate limiting | Cloudflare Rate Limiting bindings: 5 req/60 s per client IP and 30 req/60 s global. Counters are per Cloudflare location and eventually consistent (documented by Cloudflare). In production the API fails closed (503) if a binding is missing or errors. |
@@ -157,8 +157,10 @@ is automated later).
 - Worker CPU: the TypeScript runtime uses 0–5 ms for non-AI requests but 37 ms for one analysis,
   and 39 ms in two analyses, above the 10 ms documented for Workers Free (not certified).
 - Long documents (F-08): text above 30 000 characters is rejected with an explicit message (no
-  truncation); OCR (F-10) is not implemented.
-- No OCR (F-10): image-only pages are reported, not read.
+  truncation).
+- OCR (F-10) is optional, browser-only and not yet published; recognition errors are possible
+  (on the sample annex `§` was read as `$`, creating false USD candidates, and a heading was
+  dropped) and the model's handling of OCR text is not evaluated — see docs/OCR.md.
 - Compact mode is an unaccepted experiment: the model selects nearly every candidate (verbose,
   repeated amounts) and its key points copied the summary in the live trial. Whitespace tables
   show the column header but leave cell-to-column mapping to the reader; two-column lines (e.g.

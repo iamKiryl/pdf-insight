@@ -1,6 +1,6 @@
-# Current snapshot — 2026-10-06, 12:35 Warsaw (compact model comparison)
+# Current snapshot — 2026-10-06, 13:01 Warsaw (optional browser OCR, ready for review)
 
-Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 09 min left).
+Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 1 h 43 min left).
 
 | Item | State |
 |---|---|
@@ -9,7 +9,8 @@ Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 09 min left)
 | Public sample analyses on TS | P (`dd6a5db2`): 26.5 s, CPU 37 ms, accepted. **Q (`d7e5ae75`): 30.7 s upload-to-render — over the 30 s target**, CPU 39 ms, 70/71 (only latency failed), AI review pass |
 | Analysis CPU vs Free 10 ms | **not met**: 37 ms and 39 ms observed (both the first analysis after a deploy); non-AI requests 0–5 ms; no resource-limit errors |
 | Model comparison (local, compact-v4) | Gemma 4 26B: contract R accepted (18.5 s, 71/71), offer S **failed** (omitted the rejected bid, 70/73) → experiment stopped, **70B stays in production**, no adapter port or deploy (below) |
-| Checks | worker 169 tests (89 parity + 66 phrase-equivalence + 14 behaviour), backend 444, frontend 107 |
+| Browser OCR (F-10) | implemented and checked locally with real Tesseract.js on sample page 11 and a synthetic scan; **not published** (awaiting review; Worker must be deployed before Pages) — docs/OCR.md |
+| Checks | worker 174 tests (92 parity incl. new `ocr-page` + 66 phrase-equivalence + 16 behaviour), backend 459, frontend 127 |
 
 Requirements (IDs as in docs/PLAN.md):
 
@@ -24,7 +25,27 @@ Requirements (IDs as in docs/PLAN.md):
 | F-07 | Public GitHub Pages demo | yes | **not reliably**: 1 of 2 public TS analyses under 30 s (26.5 s, 30.7 s); model latency dominates (25.8 / 30.2 s per call); CPU above the documented Free limit |
 | F-08 | Long documents (SHOULD) | **no** | no |
 | F-09 | Local history (SHOULD) | yes | yes |
-| F-10 | OCR (COULD) | **no** | no |
+| F-10 | OCR (COULD) | **yes, optional, browser-only** (review pending) | no — not published; real OCR verified locally only, model handling of OCR text not evaluated |
+
+## Optional browser OCR (docs/NEXT_BROWSER_OCR.md)
+
+Full record: docs/OCR.md. Summary:
+
+- Opt-in button after extraction (partial scan and fully scanned PDF); pdf.js renders only text-less
+  pages; Tesseract.js 7.0.0 in one Web Worker, `pol`+`eng`; sequential; progress, cancel, review,
+  explicit accept/discard; no automatic model request. Bounds: ≤ 20 pages, ≤ 4 MP per page,
+  ≤ 90 s per step; existing character/body limits after OCR, no truncation.
+- Assets (worker, WASM cores, language data) pinned and served from the site (`public/ocr/`, built
+  from node_modules, 18 MB in the artifact, ≈ 9.6 MB downloaded on first use); CDP network log: no
+  third-party or API request; the text-only path loads no OCR asset.
+- Contract: optional request `ocrPages` (validated in Python and TS: ascending, unique, pages with
+  text); prompt marks `source="ocr"` pages and adds one coverage sentence only when present;
+  result `analysis.ocrPages` optional (omitted otherwise) → history/JSON keep provenance, older
+  entries stay valid. Existing parity goldens unchanged; new Python golden `ocr-page`; shared
+  fixtures: 1 accepted, 2 rejected.
+- Real OCR: synthetic scan — 1 error (`o.o.` → `0.0.`), all amounts/dates/names exact; sample
+  page 11 — amounts and dates correct, heading "ANEKS NR 1" lost, `§` → `$` ×3 → three false USD
+  candidates (found offline). Not fixed by heuristics; listed as the main open risk.
 
 ## Compact model comparison (docs/NEXT_MODEL_COMPACT.md)
 
