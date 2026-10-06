@@ -1,0 +1,9 @@
+{
+  // LOCAL-ONLY CPU profiling Worker (tools/workerd_profile), never deployed, no bindings.
+  // Usage: uv run pywrangler dev --config wrangler.profile.jsonc --port 8790
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pdf-insight-profile-local",
+  "main": "tools/workerd_profile/profile_worker.py",
+  "compatibility_date": "2026-10-05",
+  "compatibility_flags": ["python_workers"]
+}
