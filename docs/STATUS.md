@@ -1,16 +1,16 @@
-# Current snapshot — 2026-10-06, 13:01 Warsaw (optional browser OCR, ready for review)
+# Current snapshot — 2026-10-06, 13:34 Warsaw (OCR fixes published)
 
-Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 1 h 43 min left).
+Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 1 h 10 min left).
 
 | Item | State |
 |---|---|
-| Public demo | https://iamkiryl.github.io/pdf-insight/ — frontend from `54515a5` |
-| Backend | TypeScript Worker `pdf-insight-api`, version `d7e5ae75-a043-45c7-8f7f-2ecac09e9d74` (app code `17593aa`); rollback targets: TS `dd6a5db2-5c7d-4b1f-b037-b8608459087e`, Python `a4695cc8-ac6c-47a9-9253-6facf931c2b9` |
+| Public demo | https://iamkiryl.github.io/pdf-insight/ — frontend from `1b1ddd7` (CI run 37456785150, 13:31); previous `54515a5` |
+| Backend | TypeScript Worker `pdf-insight-api`, version `7f5eed60-d76e-4595-9371-3c2de449c8b4` (app code `1fd7999`, accepts `ocrPages`, 13:29); rollback targets: TS `d7e5ae75-a043-45c7-8f7f-2ecac09e9d74` (roll back the frontend first), `dd6a5db2-5c7d-4b1f-b037-b8608459087e`, Python `a4695cc8-ac6c-47a9-9253-6facf931c2b9` |
 | Public sample analyses on TS | P (`dd6a5db2`): 26.5 s, CPU 37 ms, accepted. **Q (`d7e5ae75`): 30.7 s upload-to-render — over the 30 s target**, CPU 39 ms, 70/71 (only latency failed), AI review pass |
 | Analysis CPU vs Free 10 ms | **not met**: 37 ms and 39 ms observed (both the first analysis after a deploy); non-AI requests 0–5 ms; no resource-limit errors |
 | Model comparison (local, compact-v4) | Gemma 4 26B: contract R accepted (18.5 s, 71/71), offer S **failed** (omitted the rejected bid, 70/73) → experiment stopped, **70B stays in production**, no adapter port or deploy (below) |
-| Browser OCR (F-10) | implemented and checked locally with real Tesseract.js on sample page 11 and a synthetic scan; **not published** (awaiting review; Worker must be deployed before Pages) — docs/OCR.md |
-| Checks | worker 174 tests (92 parity incl. new `ocr-page` + 66 phrase-equivalence + 16 behaviour), backend 459, frontend 127 |
+| Browser OCR (F-10) | **published**, optional, browser-only, with manual correction against the page image; review fixes `1b1ddd7` (provenance union, editing, late cleanup); page 11 and synthetic scan checked locally and on the public site without AI; model handling of OCR text **not verified** — docs/OCR.md |
+| Checks | worker 174 tests (92 parity incl. `ocr-page` + 66 phrase-equivalence + 16 behaviour), backend 459, frontend 136 |
 
 Requirements (IDs as in docs/PLAN.md):
 
@@ -25,7 +25,20 @@ Requirements (IDs as in docs/PLAN.md):
 | F-07 | Public GitHub Pages demo | yes | **not reliably**: 1 of 2 public TS analyses under 30 s (26.5 s, 30.7 s); model latency dominates (25.8 / 30.2 s per call); CPU above the documented Free limit |
 | F-08 | Long documents (SHOULD) | **no** | no |
 | F-09 | Local history (SHOULD) | yes | yes |
-| F-10 | OCR (COULD) | **yes, optional, browser-only** (review pending) | no — not published; real OCR verified locally only, model handling of OCR text not evaluated |
+| F-10 | OCR (COULD) | **yes, optional, browser-only, user-correctable** | OCR flow yes (public, no AI); AI analysis of OCR text **not verified** (no AI call allowed) |
+
+## OCR review fixes and publication (docs/REVIEW_OCR_FIXES.md)
+
+- `1b1ddd7`: OCR provenance is the union of all accepted passes (2-pass regression via applyOcr
+  and flow/request → `ocrPages: [2, 3]`); editable review with local page image, reset to machine
+  text, no automatic replacement, edited pages make no confidence claim; PDF loading aborts via
+  signal, late renders are released (fake-timer regression); remaining limit documented
+  (a still-starting Tesseract worker is terminated only when its start settles).
+- Page 11: machine errors and user corrections recorded separately (docs/OCR.md). Offline
+  candidates on the corrected text: false 5/2/3 USD gone, 12 300 / 13 100 PLN and four dates
+  kept; control "$ 5" on an unedited OCR page stays a USD amount.
+- Published Worker `7f5eed60` (13:29) then Pages `1b1ddd7` (13:31); verified without AI on the
+  public site. No AI call.
 
 ## Optional browser OCR (docs/NEXT_BROWSER_OCR.md)
 

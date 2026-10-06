@@ -1,16 +1,15 @@
 # Deployment
 
-## Current state (2026-10-06, 12:35 Warsaw — unchanged by the model comparison)
+## Current state (2026-10-06, 13:34 Warsaw)
 
 | Item | State |
 |---|---|
-| Frontend | https://iamkiryl.github.io/pdf-insight/ (GitHub Pages, CI run 37445769851, commit `54515a5`; F-09 history incl. the storage-full fix) |
-| Backend | https://pdf-insight-api.pdf-insight-api.workers.dev — **TypeScript Worker** version `d7e5ae75-a043-45c7-8f7f-2ecac09e9d74` (app code `17593aa`), 70B, compact; rollback: TS `dd6a5db2-5c7d-4b1f-b037-b8608459087e`, Python `a4695cc8-ac6c-47a9-9253-6facf931c2b9` (docs/RUNTIME.md) |
+| Frontend | https://iamkiryl.github.io/pdf-insight/ (GitHub Pages, CI run 37456785150, commit `1b1ddd7`, 13:31; optional browser OCR with correction, assets under `/pdf-insight/ocr/`); previous `54515a5` (run 37445769851) |
+| Backend | https://pdf-insight-api.pdf-insight-api.workers.dev — **TypeScript Worker** version `7f5eed60-d76e-4595-9371-3c2de449c8b4` (app code `1fd7999`, optional `ocrPages`), 70B, compact, deployed 13:29; rollback: frontend first, then TS `d7e5ae75-a043-45c7-8f7f-2ecac09e9d74` (or `dd6a5db2-…`, Python `a4695cc8-…`; docs/RUNTIME.md, docs/OCR.md) |
 | Not deployed | Python `488927e`/`3ff21cf` (superseded by the TS runtime; kept as reference) |
 | Production 429 | **observed** by Codex on 2026-10-06 ~06:59 UTC with invalid-body POSTs (no model calls); per-location and eventually consistent, not an exact cap |
 | CPU | TS: health 0–1 ms, invalid full-size 5 ms, analysis 37 ms (P) / 39 ms (Q); earlier Python: 6–18 / 16–49 / 303 ms — above the documented 10 ms Free limit |
 | Public analysis | TS P: 26.5 s, 71/71, accepted; TS Q: 30.7 s (over target), 70/71; earlier Python L: timeout (40 s) |
-| Pending (not deployed) | Optional browser OCR (docs/OCR.md): TS Worker change (`ocrPages`) must be deployed **before** the Pages build; Pages artifact grows by 18 MB (`ocr/`) |
 | Model | 70B kept: the local compact comparison with Gemma 4 failed on the offer (docs/LIVE_AI_RESULTS.md), so nothing was redeployed |
 
 The sections below are dated records of each deployment step.

@@ -4,7 +4,7 @@
 
 | | TypeScript Worker `worker/` | Python Worker `backend/` |
 |---|---|---|
-| Status | **deployed** as `pdf-insight-api`, version `d7e5ae75-a043-45c7-8f7f-2ecac09e9d74` (12:15 Warsaw, app code `17593aa`); previous TS version `dd6a5db2-5c7d-4b1f-b037-b8608459087e` (app code `191a1d8`) | previous production version `a4695cc8-ac6c-47a9-9253-6facf931c2b9` (from `c775866`), kept for exact rollback; reference implementation and evaluation tooling |
+| Status | **deployed** as `pdf-insight-api`, version `7f5eed60-d76e-4595-9371-3c2de449c8b4` (13:29 Warsaw, app code `1fd7999`, optional `ocrPages`); previous TS versions `d7e5ae75-a043-45c7-8f7f-2ecac09e9d74` (`17593aa`, rejects `ocrPages` — roll back the frontend first) and `dd6a5db2-5c7d-4b1f-b037-b8608459087e` (`191a1d8`) | previous production version `a4695cc8-ac6c-47a9-9253-6facf931c2b9` (from `c775866`), kept for exact rollback; reference implementation and evaluation tooling |
 | Modes | compact only | compact, single, chunked (experiments) |
 | Bundle / reported startup | 1 077 KiB / 149 KiB gzip, 30 ms | 8 985 KiB / 2 234 KiB gzip, 2 325 ms |
 | Cloudflare CPU, health | 0–1 ms | 6–18 ms |
@@ -31,7 +31,8 @@ log field (health looks identical for both runtimes).
 ## Rollback
 
 - **Exact previous versions:** previous TS
-  `cd worker && npx wrangler rollback dd6a5db2-5c7d-4b1f-b037-b8608459087e --name pdf-insight-api`;
+  `cd worker && npx wrangler rollback d7e5ae75-a043-45c7-8f7f-2ecac09e9d74 --name pdf-insight-api`
+  (after rolling back Pages to `54515a5`), or `dd6a5db2-5c7d-4b1f-b037-b8608459087e`;
   Python `... rollback a4695cc8-ac6c-47a9-9253-6facf931c2b9 --name pdf-insight-api`. A rollback
   restores the recorded deployment byte for byte (its bindings and vars included).
 - `cd backend && uv run pywrangler deploy` deploys the **current** Python code and config from the

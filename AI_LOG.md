@@ -588,3 +588,22 @@ read-only review unable to correct observed section-symbol/dollar mistakes, and 
 cleanup claim during initialization/late render. Prepared REVIEW_OCR_FIXES.md: preserve provenance,
 manual correction (no dollar heuristics), cleanup regression, actual page-11 candidate verification,
 conditional backend-first publication with no AI calls. CPU/latency/F08 remain open.
+
+## 2026-10-06 — OCR review fixes and publication (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_OCR_FIXES.md. Исправь сохранение
+OCR-страниц при повторном распознавании, добавь ручную коррекцию текста и поправь очистку
+ресурсов. Проверь исправленный текст страницы 11 и кандидаты сумм без AI. После успешных проверок
+опубликуй сначала Worker, затем Pages. AI-вызовы не делай.»
+
+- 13:21–13:34. `1b1ddd7`: provenance union; editable review with local page preview and reset;
+  abort signal for PDF loading and release of late renders; regressions for each review finding
+  (frontend 127 → 136 tests). A lint rule rejected setState inside an effect for the preview URL →
+  refs instead (also correct under StrictMode).
+- Real OCR (headless Chrome/CDP): machine text unchanged; Claude, acting as the user, corrected 6
+  spots after comparing with the page image (recorded separately from machine errors). Offline
+  candidates: false USD gone, PLN amounts and dates kept; "$ 5" control kept.
+- Publication: probe showed old Worker rejects `ocrPages`; deployed Worker `7f5eed60`, verified
+  without AI (probe now reaches INSUFFICIENT_CONTENT, 0 model calls); then Pages from `1b1ddd7`
+  via CI dispatch; public OCR flow verified without AI. No AI call.
+
