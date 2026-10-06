@@ -437,6 +437,80 @@ strong {
   margin-top: 16px;
 }
 
+.button--quiet {
+  border-color: var(--control); /* boundary 4.6:1, a quieter label colour */
+  color: var(--muted);
+}
+
+.button--quiet:hover {
+  color: var(--text);
+}
+
+.button--danger {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.button--danger:hover {
+  border-color: var(--error);
+  background: var(--error-bg);
+}
+
+/* ------------------------------------------------------------------ history */
+
+.history__notice {
+  font-size: 0.92rem;
+}
+
+.history__status {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius);
+  background: var(--warning-bg);
+  font-size: 0.92rem;
+}
+
+.history__list {
+  margin: 14px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.history__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.history__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.history__title {
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.history__meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.history__actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* ------------------------------------------------------------------ ready / progress */
 
 .facts {

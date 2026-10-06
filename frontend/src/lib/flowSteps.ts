@@ -46,6 +46,15 @@ export function flowSteps(state: FlowState): FlowStep[] {
   }));
 }
 
+/** All four steps done, the last current: a finished result (also reopened from history). */
+export function finishedSteps(): FlowStep[] {
+  return flowSteps({ phase: 'idle' }).map((step, i, all) => ({
+    ...step,
+    status: 'done',
+    current: i === all.length - 1,
+  }));
+}
+
 export const STEP_STATUS_LABELS: Record<StepStatus, string> = {
   done: 'zakończono',
   active: 'w toku',

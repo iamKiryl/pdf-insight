@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { downloadFileName, downloadJson, serializeResult } from '../lib/download';
-import { formatAmount, formatDate, formatSeconds, languageName } from '../lib/format';
+import {
+  formatAmount,
+  formatDate,
+  formatSavedAt,
+  formatSeconds,
+  languageName,
+} from '../lib/format';
 import { DOCUMENT_TYPE_LABELS } from '../lib/messages';
 import type { AnalysisResult } from '../lib/schema';
 import { PartialWarning } from './PartialWarning';
@@ -9,9 +15,13 @@ interface Props {
   result: AnalysisResult;
   durationMs: number;
   onReset: () => void;
+  /** Set when the result was reopened from local history (no new AI request). */
+  savedAt?: string;
+  /** True when this fresh result was saved to local history. */
+  savedToHistory?: boolean;
 }
 
-export function ResultView({ result, durationMs, onReset }: Props) {
+export function ResultView({ result, durationMs, onReset, savedAt, savedToHistory }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const json = useMemo(() => serializeResult(result), [result]);
   const { document: doc, analysis } = result;
@@ -21,7 +31,13 @@ export function ResultView({ result, durationMs, onReset }: Props) {
     <article className="result" lang={doc.language} aria-labelledby="result-title">
       <header className="panel panel--report">
         <p className="label label--accent" lang="pl">
-          04 · Wynik analizy
+          {savedAt ? (
+            <>
+              Historia · zapisano <time dateTime={savedAt}>{formatSavedAt(savedAt)}</time>
+            </>
+          ) : (
+            '04 · Wynik analizy'
+          )}
         </p>
         <p className="eyebrow" lang="pl">
           {DOCUMENT_TYPE_LABELS[doc.type]} · {languageName(doc.language)} · {doc.pages}{' '}
@@ -34,6 +50,8 @@ export function ResultView({ result, durationMs, onReset }: Props) {
         <p className="muted break" lang="pl">
           {doc.fileName} · analiza: {formatSeconds(durationMs)}
           {analysis?.titleFallback ? ' · tytuł nie został znaleziony w dokumencie' : ''}
+          {savedAt ? ' · otwarto z historii, bez ponownej analizy' : ''}
+          {savedToHistory ? ' · zapisano w historii na tym urządzeniu' : ''}
         </p>
         {analysis && !analysis.complete && (
           <div lang="pl">

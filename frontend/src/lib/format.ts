@@ -37,3 +37,10 @@ export function formatBytes(bytes: number): string {
 export function formatSeconds(ms: number): string {
   return `${(ms / 1000).toLocaleString('pl-PL', { maximumFractionDigits: 1 })} s`;
 }
+
+const savedFormat = new Intl.DateTimeFormat('pl-PL', { dateStyle: 'medium', timeStyle: 'short' });
+
+/** When a history entry was saved, in the visitor's local time. */
+export function formatSavedAt(iso: string): string {
+  return savedFormat.format(new Date(iso));
+}

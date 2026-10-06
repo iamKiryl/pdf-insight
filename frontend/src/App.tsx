@@ -1,14 +1,31 @@
+import { useEffect, useRef, useState } from 'react';
 import { FileDropzone } from './components/FileDropzone';
 import { FlowSteps } from './components/FlowSteps';
+import { HistoryPanel } from './components/HistoryPanel';
 import { ResultView } from './components/ResultView';
 import { AnalyzingStatus, ErrorPanel, ReadingStatus, ReadyPanel } from './components/StatusPanels';
-import { flowSteps } from './lib/flowSteps';
+import { finishedSteps, flowSteps } from './lib/flowSteps';
+import type { HistoryEntry } from './lib/history';
 import { AI_NOTICE } from './lib/messages';
+import type { AnalysisResult } from './lib/schema';
 import { useAnalysisFlow } from './lib/useAnalysisFlow';
+import { useHistory, type HistoryStorageOption } from './lib/useHistory';
 
-export function App() {
+export function App({ historyStorage }: { historyStorage?: HistoryStorageOption } = {}) {
   const { state, selectFile, start, cancel, reset } = useAnalysisFlow();
-  const steps = flowSteps(state);
+  const history = useHistory(historyStorage);
+  const [opened, setOpened] = useState<HistoryEntry | null>(null);
+  const saved = useRef<AnalysisResult | null>(null);
+  const { add } = history;
+
+  // A finished analysis is saved once (validated result + file metadata only).
+  useEffect(() => {
+    if (state.phase !== 'done' || saved.current === state.result) return;
+    saved.current = state.result;
+    add(state.result, { fileBytes: state.doc.fileBytes, durationMs: state.durationMs });
+  }, [state, add]);
+
+  const steps = opened ? finishedSteps() : flowSteps(state);
   const current = steps.find((step) => step.current);
 
   return (
@@ -41,8 +58,30 @@ export function App() {
           {state.phase === 'done' && 'Analiza zakończona.'}
         </div>
 
-        {state.phase === 'idle' && <FileDropzone onFile={(file) => void selectFile(file)} />}
-        {state.phase === 'reading' && (
+        {opened && (
+          <ResultView
+            result={opened.result}
+            durationMs={opened.durationMs}
+            savedAt={opened.savedAt}
+            onReset={() => {
+              setOpened(null);
+            }}
+          />
+        )}
+        {!opened && state.phase === 'idle' && (
+          <>
+            <FileDropzone onFile={(file) => void selectFile(file)} />
+            <HistoryPanel
+              entries={history.entries}
+              status={history.status}
+              skipped={history.skipped}
+              onOpen={setOpened}
+              onRemove={history.remove}
+              onClear={history.clear}
+            />
+          </>
+        )}
+        {!opened && state.phase === 'reading' && (
           <ReadingStatus
             fileName={state.fileName}
             page={state.page}
@@ -50,7 +89,7 @@ export function App() {
             onCancel={cancel}
           />
         )}
-        {state.phase === 'ready' && (
+        {!opened && state.phase === 'ready' && (
           <ReadyPanel
             doc={state.doc}
             readiness={state.readiness}
@@ -58,22 +97,27 @@ export function App() {
             onReset={reset}
           />
         )}
-        {state.phase === 'analyzing' && (
+        {!opened && state.phase === 'analyzing' && (
           <AnalyzingStatus
             fileName={state.doc.fileName}
             startedAt={state.startedAt}
             onCancel={cancel}
           />
         )}
-        {state.phase === 'error' && (
+        {!opened && state.phase === 'error' && (
           <ErrorPanel
             message={state.message}
             onRetry={state.retry ? start : null}
             onReset={reset}
           />
         )}
-        {state.phase === 'done' && (
-          <ResultView result={state.result} durationMs={state.durationMs} onReset={reset} />
+        {!opened && state.phase === 'done' && (
+          <ResultView
+            result={state.result}
+            durationMs={state.durationMs}
+            savedToHistory={history.entries.some((entry) => entry.result === state.result)}
+            onReset={reset}
+          />
         )}
       </main>
 
