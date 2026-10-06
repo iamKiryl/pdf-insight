@@ -498,3 +498,11 @@ Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_TS_DEPLOY.md. 
 - One public analysis: 26.5 s, 1 call, 37 ms CPU, 71/71, review pass (Claude, AI). No retries.
 - RUNTIME rollback instructions corrected: exact rollback by version id; `pywrangler deploy`
   deploys current Python code, not the old version.
+
+## 2026-10-06 — Deployed TS result review (Codex)
+
+Read d2d92fe and saved P evaluator/browser/numeric-tail artifacts. Confirmed recorded 71/71 and
+26.5 s public success; 37 ms CPU remains open. Noted 303-to-37 comparison spans a timeout and a
+success, not matched workloads. Prepared NEXT_CPU_CHECK.md for bounded offline CPU profiling,
+small parity-preserving fixes only, and at most one additional quota-bounded public analysis.
+No model call or deployment by Codex.
