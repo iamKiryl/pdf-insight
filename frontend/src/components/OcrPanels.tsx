@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
+import { hasLetter } from '../lib/contract';
 import { formatPageList } from '../lib/format';
 import { OCR_NOTICE, readinessMessage, type UserMessage } from '../lib/messages';
-import type { OcrPageResult } from '../lib/ocr';
+import type { OcrEdits, OcrPageResult } from '../lib/ocr';
 import type { Readiness } from '../lib/request';
 
 /** Provenance note wherever OCR text was used (before analysis and on the result). */
@@ -88,15 +89,83 @@ export function RecognizingStatus(props: {
   );
 }
 
+/** Page image via an object URL that lives only while the preview is mounted. */
+function PagePreview({ image, page }: { image: Blob; page: number }) {
+  const linkRef = useRef<HTMLAnchorElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const url = URL.createObjectURL(image);
+    if (linkRef.current) linkRef.current.href = url;
+    if (imgRef.current) imgRef.current.src = url;
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [image]);
+  return (
+    <a ref={linkRef} className="ocr-page__preview" target="_blank" rel="noreferrer">
+      <img ref={imgRef} alt={`Obraz strony ${String(page)} z pliku PDF (do porównania)`} />
+      <span className="label">Otwórz obraz strony {page} w pełnym rozmiarze</span>
+    </a>
+  );
+}
+
+function OcrPageEditor(props: {
+  result: OcrPageResult;
+  text: string;
+  edited: boolean;
+  onEdit: (text: string) => void;
+  onReset: () => void;
+}) {
+  const { result, text, edited } = props;
+  const id = `ocr-text-${result.page}`;
+  const noText = !hasLetter(text);
+  return (
+    <div className="ocr-page">
+      <label className="label" htmlFor={id}>
+        Strona {result.page} — tekst do sprawdzenia i poprawy
+      </label>
+      <p className="muted ocr-page__meta">
+        {edited
+          ? 'Poprawiono ręcznie (pewność OCR dotyczyła tylko tekstu maszynowego).'
+          : result.status === 'unreadable'
+            ? 'OCR nie rozpoznał tekstu — możesz go wpisać, porównując z obrazem strony.'
+            : `Tekst maszynowy, pewność OCR ${String(result.confidence)}/100 (orientacyjnie).`}{' '}
+        {text.length.toLocaleString('pl-PL')} znaków
+        {noText ? ' · strona pozostanie nieprzeanalizowana' : ''}
+      </p>
+      <div className="ocr-page__compare">
+        {result.preview && <PagePreview image={result.preview} page={result.page} />}
+        <textarea
+          id={id}
+          className="ocr-page__text"
+          value={text}
+          spellCheck={false}
+          onChange={(event) => {
+            props.onEdit(event.target.value);
+          }}
+        />
+      </div>
+      {edited && (
+        <button type="button" className="button button--quiet" onClick={props.onReset}>
+          Przywróć tekst rozpoznany przez OCR
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function OcrReview(props: {
   results: readonly OcrPageResult[];
+  edits: OcrEdits;
   readiness: Readiness;
+  /** Pages this review would add as OCR text. */
   recovered: readonly number[];
+  onEdit: (page: number, text: string) => void;
+  onResetPage: (page: number) => void;
   onAccept: () => void;
   onDiscard: () => void;
 }) {
-  const { results, readiness, recovered } = props;
-  const unreadable = results.filter((r) => r.status === 'unreadable').map((r) => r.page);
+  const { results, edits, readiness, recovered } = props;
   const problem = readiness.problem ? readinessMessage(readiness.problem) : null;
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => headingRef.current?.focus(), []);
@@ -104,31 +173,27 @@ export function OcrReview(props: {
     <section className="panel" aria-labelledby="ocr-review-title">
       <p className="label label--accent">02 · Wynik OCR do sprawdzenia</p>
       <h2 id="ocr-review-title" ref={headingRef} tabIndex={-1} className="panel__title">
-        Sprawdź rozpoznany tekst
+        Sprawdź i popraw rozpoznany tekst
       </h2>
       <p className="notice__text">{OCR_NOTICE}</p>
-      {unreadable.length > 0 && (
-        <div className="warning" role="note">
-          <span className="warning__symbol" aria-hidden="true">
-            ⚠
-          </span>
-          <strong>Nie rozpoznano tekstu:</strong> {unreadable.length === 1 ? 'strona' : 'strony'}{' '}
-          {formatPageList(unreadable)} — pozostanie oznaczona jako nieprzeanalizowana.
-        </div>
-      )}
-      {results
-        .filter((r) => r.status === 'recognized')
-        .map((r) => (
-          <div key={r.page} className="ocr-page">
-            <p className="label">
-              Strona {r.page} · pewność OCR {r.confidence}/100 ·{' '}
-              {r.text.length.toLocaleString('pl-PL')} znaków
-            </p>
-            <pre className="ocr-page__text" tabIndex={0} aria-label={`Tekst OCR strony ${r.page}`}>
-              {r.text}
-            </pre>
-          </div>
-        ))}
+      <p className="muted">
+        Porównaj tekst z obrazem strony i popraw błędy (np. „$” zamiast „§”, „0” zamiast „o”,
+        pominięty nagłówek). Nic nie jest zmieniane automatycznie.
+      </p>
+      {results.map((result) => (
+        <OcrPageEditor
+          key={result.page}
+          result={result}
+          text={edits[result.page] ?? result.text}
+          edited={edits[result.page] !== undefined && edits[result.page] !== result.text}
+          onEdit={(text) => {
+            props.onEdit(result.page, text);
+          }}
+          onReset={() => {
+            props.onResetPage(result.page);
+          }}
+        />
+      ))}
       {problem && (
         <div className="warning" role="alert">
           <strong>{problem.title}.</strong> {problem.detail}
@@ -141,7 +206,7 @@ export function OcrReview(props: {
           onClick={props.onAccept}
           disabled={recovered.length === 0 || problem !== null}
         >
-          Użyj rozpoznanego tekstu
+          Użyj tego tekstu
         </button>
         <button type="button" className="button" onClick={props.onDiscard}>
           Odrzuć OCR

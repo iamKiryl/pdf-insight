@@ -23,10 +23,13 @@ export type OcrPageStatus = 'recognized' | 'unreadable';
 
 export interface OcrPageResult {
   page: number;
+  /** Machine-recognised text (kept unchanged; user corrections live in the review state). */
   text: string;
-  /** Tesseract mean word confidence 0–100 (an indicator only, not accuracy). */
+  /** Tesseract mean word confidence 0–100 for the machine text (an indicator only). */
   confidence: number;
   status: OcrPageStatus;
+  /** The rendered page image for side-by-side comparison; browser memory only, never sent. */
+  preview: Blob | null;
 }
 
 export class OcrError extends Error {
@@ -43,13 +46,19 @@ export interface OcrEngine {
   terminate(): Promise<unknown>;
 }
 
+export interface RenderedPage {
+  canvas: HTMLCanvasElement;
+  release: () => void;
+}
+
 export interface RenderedPdf {
-  render(page: number): Promise<{ canvas: HTMLCanvasElement; release: () => void }>;
+  render(page: number): Promise<RenderedPage>;
   destroy(): void;
 }
 
 export interface OcrDeps {
-  openPdf: (source: Blob) => Promise<RenderedPdf>;
+  /** `signal` aborts loading itself (the pdf.js task is destroyed before it resolves). */
+  openPdf: (source: Blob, signal: AbortSignal) => Promise<RenderedPdf>;
   createEngine: () => Promise<OcrEngine>;
 }
 
@@ -77,10 +86,16 @@ async function createTesseractEngine(): Promise<OcrEngine> {
   };
 }
 
-async function openPdfWithPdfJs(source: Blob): Promise<RenderedPdf> {
+async function openPdfWithPdfJs(source: Blob, signal: AbortSignal): Promise<RenderedPdf> {
   const pdfjs = await loadPdfJs();
-  const task = pdfjs.getDocument({ data: new Uint8Array(await source.arrayBuffer()) });
-  const doc = await task.promise;
+  const data = new Uint8Array(await source.arrayBuffer());
+  if (signal.aborted) throw new OcrError('cancelled');
+  const task = pdfjs.getDocument({ data });
+  const destroy = () => void task.destroy();
+  signal.addEventListener('abort', destroy, { once: true });
+  const doc = await task.promise.finally(() => {
+    signal.removeEventListener('abort', destroy);
+  });
   return {
     async render(number) {
       const page = await doc.getPage(number);
@@ -100,8 +115,16 @@ async function openPdfWithPdfJs(source: Blob): Promise<RenderedPdf> {
         },
       };
     },
-    destroy: () => void task.destroy(),
+    destroy,
   };
+}
+
+/** JPEG snapshot of a rendered page for the review step (null where canvases cannot encode). */
+function snapshot(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  if (typeof canvas.toBlob !== 'function') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, 'image/jpeg', 0.85);
+  });
 }
 
 const defaultDeps: OcrDeps = { openPdf: openPdfWithPdfJs, createEngine: createTesseractEngine };
@@ -136,8 +159,11 @@ function bounded<T>(promise: Promise<T>, ms: number, signal: AbortSignal): Promi
 }
 
 /**
- * Recognises the given pages sequentially. Aborting terminates the OCR worker and the pdf.js task
- * at once; both are always released when the run ends.
+ * Recognises the given pages sequentially. Abort (or a timeout) rejects the run immediately,
+ * terminates a started OCR worker, destroys the pdf.js document or its loading task, and releases
+ * a page render that completes late. Limit: Tesseract.js cannot cancel a worker that is still
+ * starting — it is terminated as soon as its start settles (if it never settles, it lives until
+ * the page is closed).
  */
 export async function recognizePages(
   source: Blob,
@@ -147,10 +173,13 @@ export async function recognizePages(
   deps: OcrDeps = defaultDeps,
 ): Promise<OcrPageResult[]> {
   if (pages.length > OCR_LIMITS.maxPages) throw new OcrError('too-many-pages');
+  // Stops loading on cancel and on any failure or timeout of this run.
+  const stop = new AbortController();
   let pdf: RenderedPdf | null = null;
   let engine: OcrEngine | null = null;
   const active = (): { pdf: RenderedPdf | null; engine: OcrEngine | null } => ({ pdf, engine });
   const release = () => {
+    stop.abort();
     pdf?.destroy();
     pdf = null;
     const running = engine;
@@ -165,8 +194,8 @@ export async function recognizePages(
     check();
     onProgress(0, pages.length, pages[0] ?? 0);
     try {
-      // A PDF or engine that finishes loading after an abort or a timeout is released at once.
-      const opening = deps.openPdf(source);
+      // A PDF or engine that finishes loading after an abort or a timeout is released then.
+      const opening = deps.openPdf(source, stop.signal);
       pdf = await bounded(opening, OCR_LIMITS.pageTimeoutMs, signal).catch((error: unknown) => {
         void opening.then(
           (late) => {
@@ -196,14 +225,20 @@ export async function recognizePages(
       onProgress(index, pages.length, number);
       const current = active();
       if (!current.pdf || !current.engine) throw new OcrError('cancelled');
-      const image = await bounded(
-        current.pdf.render(number),
-        OCR_LIMITS.pageTimeoutMs,
-        signal,
-      ).catch((error: unknown) => {
-        check();
-        throw error instanceof OcrError ? error : new OcrError('failed');
-      });
+      const rendering = current.pdf.render(number);
+      const image = await bounded(rendering, OCR_LIMITS.pageTimeoutMs, signal).catch(
+        (error: unknown) => {
+          // A render finishing after a timeout or cancel still releases its canvas and page.
+          void rendering.then(
+            (late) => {
+              late.release();
+            },
+            () => undefined,
+          );
+          check();
+          throw error instanceof OcrError ? error : new OcrError('failed');
+        },
+      );
       try {
         check();
         const { text, confidence } = await bounded(
@@ -213,11 +248,14 @@ export async function recognizePages(
         );
         check();
         const cleaned = cleanOcrText(text);
+        const preview = await snapshot(image.canvas).catch(() => null);
+        check();
         results.push({
           page: number,
           text: cleaned,
           confidence: Math.round(confidence),
           status: hasLetter(cleaned) ? 'recognized' : 'unreadable',
+          preview,
         });
       } catch (error) {
         check();
@@ -234,28 +272,37 @@ export async function recognizePages(
   }
 }
 
+/** User corrections of OCR text, by page (absent: the machine text is used as recognised). */
+export type OcrEdits = Readonly<Record<number, string>>;
+
 /**
- * The document with accepted OCR text on its originally scanned pages. Text-layer pages are never
- * touched; pages whose OCR text has no letters stay without text and stay flagged.
+ * The document with accepted OCR text (machine or user-corrected) on pages that had no text.
+ * Text-layer pages are never touched; pages that still have no letters stay flagged. OCR
+ * provenance accumulates: pages accepted in an earlier pass stay marked.
  */
 export function applyOcr(
   doc: ExtractedDocument,
   results: readonly OcrPageResult[],
+  edits: OcrEdits = {},
 ): ExtractedDocument {
   const missing = new Set(doc.pagesWithoutText);
-  const recognized = new Map(
-    results
-      .filter((r) => r.status === 'recognized' && missing.has(r.page) && hasLetter(r.text))
-      .map((r) => [r.page, r.text]),
-  );
+  const accepted = new Map<number, string>();
+  for (const result of results) {
+    const text = edits[result.page] ?? result.text;
+    if (missing.has(result.page) && hasLetter(text)) accepted.set(result.page, text);
+  }
   const pages = doc.pages.map((page) => {
-    const text = recognized.get(page.page);
+    const text = accepted.get(page.page);
     return text === undefined ? page : { page: page.page, text };
   });
+  const withText = new Set(pages.filter((p) => hasLetter(p.text)).map((p) => p.page));
+  const ocrPages = [...new Set([...(doc.ocrPages ?? []), ...accepted.keys()])]
+    .filter((page) => withText.has(page))
+    .sort((a, b) => a - b);
   return {
     ...doc,
     pages,
-    pagesWithoutText: pages.filter((p) => !hasLetter(p.text)).map((p) => p.page),
-    ocrPages: [...recognized.keys()].sort((a, b) => a - b),
+    pagesWithoutText: pages.filter((p) => !withText.has(p.page)).map((p) => p.page),
+    ocrPages,
   };
 }

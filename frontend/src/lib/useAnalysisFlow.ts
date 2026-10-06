@@ -8,7 +8,7 @@ import {
   readinessMessage,
   type UserMessage,
 } from './messages';
-import { OcrError, applyOcr, recognizePages, type OcrPageResult } from './ocr';
+import { OcrError, applyOcr, recognizePages, type OcrEdits, type OcrPageResult } from './ocr';
 import { PdfExtractionError, checkFile, extractPdf, type ExtractedDocument } from './pdf';
 import { prepareRequest, type Readiness } from './request';
 import type { AnalysisResult } from './schema';
@@ -50,13 +50,34 @@ export type FlowState =
   | {
       phase: 'ocr-review';
       origin: OcrOrigin;
+      /** Machine OCR output, unchanged (for reset and comparison). */
       results: OcrPageResult[];
+      /** The user's corrections by page. */
+      edits: OcrEdits;
       merged: ExtractedDocument;
       readiness: Readiness;
     };
 
+type ReviewState = Extract<FlowState, { phase: 'ocr-review' }>;
+
+function originDoc(origin: OcrOrigin): ExtractedDocument {
+  return origin.phase === 'ready' ? origin.doc : origin.ocr;
+}
+
+/** Review state with the document and readiness recomputed from machine text plus edits. */
+function reviewState(origin: OcrOrigin, results: OcrPageResult[], edits: OcrEdits): ReviewState {
+  const merged = applyOcr(originDoc(origin), results, edits);
+  return { phase: 'ocr-review', origin, results, edits, merged, readiness: prepareRequest(merged) };
+}
+
+/** Pages this review adds as OCR text (earlier accepted OCR pages excluded). */
+export function newOcrPages(state: ReviewState): number[] {
+  const before = new Set(originDoc(state.origin).ocrPages ?? []);
+  return (state.merged.ocrPages ?? []).filter((page) => !before.has(page));
+}
+
 type Analyze = typeof analyzeDocument;
-type Extract = typeof extractPdf;
+type ExtractPdf = typeof extractPdf;
 type Recognize = typeof recognizePages;
 
 /**
@@ -65,7 +86,7 @@ type Recognize = typeof recognizePages;
  * never replace a newer state.
  */
 export function useAnalysisFlow(
-  deps: { analyze?: Analyze; extract?: Extract; recognize?: Recognize } = {},
+  deps: { analyze?: Analyze; extract?: ExtractPdf; recognize?: Recognize } = {},
 ) {
   const analyze = deps.analyze ?? analyzeDocument;
   const extract = deps.extract ?? extractPdf;
@@ -160,7 +181,7 @@ export function useAnalysisFlow(
     else if (state.phase === 'error' && state.ocr)
       origin = { ...state, stage: 'read', retry: null, ocr: state.ocr };
     else return;
-    const doc = origin.phase === 'ready' ? origin.doc : origin.ocr;
+    const doc = originDoc(origin);
     if (!doc.source || doc.pagesWithoutText.length === 0) return;
     const run = startRun();
     const pages = doc.pagesWithoutText;
@@ -171,14 +192,7 @@ export function useAnalysisFlow(
         if (run.isCurrent()) setState({ ...base, total, done, page });
       });
       if (!run.isCurrent()) return;
-      const merged = applyOcr(doc, results);
-      setState({
-        phase: 'ocr-review',
-        origin,
-        results,
-        merged,
-        readiness: prepareRequest(merged),
-      });
+      setState(reviewState(origin, results, {}));
     } catch (error) {
       if (!run.isCurrent()) return;
       const reason = error instanceof OcrError ? error.reason : 'failed';
@@ -187,9 +201,29 @@ export function useAnalysisFlow(
     }
   }, [recognize, startRun, state]);
 
+  /** The user corrects one page (never automated); readiness and missing pages are recomputed. */
+  const editOcr = useCallback((page: number, text: string) => {
+    setState((current) =>
+      current.phase === 'ocr-review'
+        ? reviewState(current.origin, current.results, { ...current.edits, [page]: text })
+        : current,
+    );
+  }, []);
+
+  /** Restores the machine-recognised text of one page. */
+  const resetOcrPage = useCallback((page: number) => {
+    setState((current) => {
+      if (current.phase !== 'ocr-review') return current;
+      const edits = Object.fromEntries(
+        Object.entries(current.edits).filter(([key]) => Number(key) !== page),
+      );
+      return reviewState(current.origin, current.results, edits);
+    });
+  }, []);
+
   /** The user accepts the reviewed OCR text: back to "ready", now with OCR pages marked. */
   const acceptOcr = useCallback(() => {
-    if (state.phase !== 'ocr-review' || state.readiness.problem || !state.merged.ocrPages?.length)
+    if (state.phase !== 'ocr-review' || state.readiness.problem || !newOcrPages(state).length)
       return;
     startRun();
     setState({ phase: 'ready', doc: state.merged, readiness: state.readiness });
@@ -224,5 +258,16 @@ export function useAnalysisFlow(
     setState({ phase: 'idle' });
   }, [startRun]);
 
-  return { state, selectFile, start, cancel, reset, startOcr, acceptOcr, discardOcr };
+  return {
+    state,
+    selectFile,
+    start,
+    cancel,
+    reset,
+    startOcr,
+    editOcr,
+    resetOcrPage,
+    acceptOcr,
+    discardOcr,
+  };
 }

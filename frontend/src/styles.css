@@ -861,9 +861,45 @@ td.context {
   margin-top: 16px;
 }
 
+.ocr-page__meta {
+  margin: 4px 0 8px;
+  font-size: 0.85rem;
+}
+
+.ocr-page__compare {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 900px) {
+  .ocr-page__compare {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.ocr-page__preview {
+  display: block;
+  color: var(--muted, inherit);
+}
+
+.ocr-page__preview img {
+  display: block;
+  width: 100%;
+  max-height: 32rem;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
 .ocr-page__text {
-  max-height: 18rem;
-  margin: 6px 0 0;
+  width: 100%;
+  min-height: 18rem;
+  max-height: 32rem;
+  margin: 0;
+  color: inherit;
+  resize: vertical;
   padding: 12px;
   overflow: auto;
   border: 1px solid var(--border);

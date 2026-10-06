@@ -58,8 +58,8 @@ describe('recognizePages', () => {
     const progress: [number, number, number][] = [];
     const results = await recognizePages(blob, [2, 3], new AbortController().signal, (...p) => progress.push(p), deps);
     expect(results).toEqual([
-      { page: 2, text: 'Aneks nr 1\n\nKwota 5 000,00 zł', confidence: 88, status: 'recognized' },
-      { page: 3, text: '| ~', confidence: 88, status: 'unreadable' },
+      { page: 2, text: 'Aneks nr 1\n\nKwota 5 000,00 zł', confidence: 88, status: 'recognized', preview: null },
+      { page: 3, text: '| ~', confidence: 88, status: 'unreadable', preview: null },
     ]);
     expect(progress.at(-1)).toEqual([2, 2, 3]);
     expect(released).toEqual([2, 3]);
@@ -131,9 +131,15 @@ describe('recognizePages', () => {
 describe('applyOcr', () => {
   it('fills only scanned pages, keeps page numbers and flags unrecovered pages', () => {
     const merged = applyOcr(doc, [
-      { page: 2, text: 'Aneks nr 1. Kwota 5 000,00 zł.', confidence: 90, status: 'recognized' },
-      { page: 3, text: '|', confidence: 10, status: 'unreadable' },
-      { page: 1, text: 'NADPISANIE', confidence: 99, status: 'recognized' },
+      {
+        page: 2,
+        text: 'Aneks nr 1. Kwota 5 000,00 zł.',
+        confidence: 90,
+        status: 'recognized',
+        preview: null,
+      },
+      { page: 3, text: '|', confidence: 10, status: 'unreadable', preview: null },
+      { page: 1, text: 'NADPISANIE', confidence: 99, status: 'recognized', preview: null },
     ]);
     expect(merged.pages.map((p) => p.page)).toEqual([1, 2, 3]);
     expect(merged.pages[0]?.text).toBe(body);
@@ -151,7 +157,7 @@ describe('applyOcr', () => {
       'pagesWithoutText',
     ]);
     const merged = applyOcr(doc, [
-      { page: 2, text: 'Aneks nr 1.', confidence: 90, status: 'recognized' },
+      { page: 2, text: 'Aneks nr 1.', confidence: 90, status: 'recognized', preview: null },
     ]);
     expect(prepareRequest(merged).request.ocrPages).toEqual([2]);
     expect(prepareRequest(applyOcr(doc, [])).request).not.toHaveProperty('ocrPages');
@@ -159,7 +165,9 @@ describe('applyOcr', () => {
 
   it('existing character limits apply after OCR (no truncation)', () => {
     const long = 'Ą'.repeat(20_001);
-    const merged = applyOcr(doc, [{ page: 2, text: long, confidence: 90, status: 'recognized' }]);
+    const merged = applyOcr(doc, [
+      { page: 2, text: long, confidence: 90, status: 'recognized', preview: null },
+    ]);
     const readiness = prepareRequest(merged);
     expect(readiness.problem).toBe('page-too-long');
     expect(readiness.request.pages[1]?.text).toBe(long);
@@ -169,3 +177,85 @@ describe('applyOcr', () => {
     expect(cleanOcrText('  a  \n\n\n\nb \n')).toBe('a\n\nb');
   });
 });
+
+describe('review fixes (REVIEW_OCR_FIXES)', () => {
+  const ok = (page: number, text: string) =>
+    ({ page, text, confidence: 90, status: 'recognized', preview: null }) as const;
+
+  it('a second OCR pass keeps earlier provenance (union, sorted, only pages with text)', () => {
+    const first = applyOcr(doc, [ok(2, 'Aneks nr 1.'), { ...ok(3, '|'), status: 'unreadable' }]);
+    expect(first.ocrPages).toEqual([2]);
+    expect(first.pagesWithoutText).toEqual([3]);
+    const second = applyOcr(first, [ok(3, 'Załącznik nr 2.'), ok(1, 'NADPISANIE')]);
+    expect(second.ocrPages).toEqual([2, 3]);
+    expect(second.pages[0]?.text).toBe(body); // a text-layer page never becomes OCR text
+    expect(second.pages[1]?.text).toBe('Aneks nr 1.');
+    expect(prepareRequest(second).request.ocrPages).toEqual([2, 3]);
+    const empty = applyOcr(first, [{ ...ok(3, ''), status: 'unreadable' }]);
+    expect(empty.ocrPages).toEqual([2]); // an empty/failed pass never erases provenance
+  });
+
+  it('user corrections replace machine text, keep provenance and recompute missing pages', () => {
+    const machine = [ok(2, 'zmienić $ 5 ust. 2 Umowy'), { ...ok(3, ''), status: 'unreadable' as const }];
+    const edited = applyOcr(doc, machine, { 2: 'zmienić § 5 ust. 2 Umowy', 3: 'Wpisane ręcznie.' });
+    expect(edited.pages[1]?.text).toBe('zmienić § 5 ust. 2 Umowy');
+    expect(edited.pages[2]?.text).toBe('Wpisane ręcznie.');
+    expect(edited.ocrPages).toEqual([2, 3]);
+    expect(edited.pagesWithoutText).toEqual([]);
+    expect(machine[0]?.text).toBe('zmienić $ 5 ust. 2 Umowy'); // machine text kept for reset
+    const cleared = applyOcr(doc, machine, { 2: '   ' });
+    expect(cleared.pagesWithoutText).toEqual([2, 3]);
+    expect(cleared.ocrPages).toEqual([]);
+  }); // prettier-ignore
+
+  it('nothing is replaced automatically: an unedited genuine "$ 5" stays as recognised', () => {
+    const merged = applyOcr(doc, [ok(2, 'Opłata wynosi $ 5 netto.')]);
+    expect(merged.pages[1]?.text).toBe('Opłata wynosi $ 5 netto.');
+  });
+
+  it('a page render that finishes after a timeout is still released', async () => {
+    vi.useFakeTimers();
+    try {
+      const late = deferred<{ canvas: HTMLCanvasElement; release: () => void }>();
+      const release = vi.fn();
+      const { deps } = fakeDeps({});
+      const opened = await deps.openPdf(blob, new AbortController().signal);
+      const run = recognizePages(blob, [2], new AbortController().signal, () => undefined, {
+        ...deps,
+        openPdf: () => Promise.resolve({ ...opened, render: () => late.promise }),
+      });
+      const assertion = expect(run).rejects.toMatchObject({ reason: 'timeout' });
+      await vi.advanceTimersByTimeAsync(OCR_LIMITS.pageTimeoutMs + 1);
+      await assertion;
+      late.resolve({ canvas, release });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(release).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancel aborts PDF loading through its signal before the document resolves', async () => {
+    let loadSignal: AbortSignal | undefined;
+    const { deps } = fakeDeps({});
+    const controller = new AbortController();
+    const run = recognizePages(blob, [2], controller.signal, () => undefined, {
+      ...deps,
+      openPdf: (_source, signal) => {
+        loadSignal = signal;
+        return new Promise(() => undefined);
+      },
+    });
+    controller.abort();
+    await expect(run).rejects.toMatchObject({ reason: 'cancelled' });
+    expect(loadSignal?.aborted).toBe(true);
+  });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}

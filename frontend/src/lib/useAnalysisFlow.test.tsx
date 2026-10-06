@@ -140,7 +140,13 @@ describe('optional browser OCR in the flow', () => {
   const source = new Blob(['%PDF-1.7']);
   const scanned: ExtractedDocument = { ...extracted, source };
   const ocrResult: OcrPageResult[] = [
-    { page: 2, text: 'Aneks nr 1. Kwota 5 000,00 zł netto.', confidence: 90, status: 'recognized' },
+    {
+      page: 2,
+      text: 'Aneks nr 1. Kwota 5 000,00 zł netto.',
+      confidence: 90,
+      status: 'recognized',
+      preview: null,
+    },
   ];
 
   async function scannedHook(recognize: typeof recognizePages, doc = scanned) {
@@ -229,7 +235,9 @@ describe('optional browser OCR in the flow', () => {
   it('an unreadable page stays flagged and cannot be accepted alone', async () => {
     const recognize = vi
       .fn<typeof recognizePages>()
-      .mockResolvedValue([{ page: 2, text: '|', confidence: 12, status: 'unreadable' }]);
+      .mockResolvedValue([
+        { page: 2, text: '|', confidence: 12, status: 'unreadable', preview: null },
+      ]);
     const { result } = await scannedHook(recognize);
     await act(() => result.current.startOcr());
     act(() => {
@@ -250,7 +258,7 @@ describe('optional browser OCR in the flow', () => {
     const text = 'Aneks nr 1 do umowy. Wynagrodzenie netto wynosi 48 750,00 zł. '.repeat(5);
     const recognize = vi
       .fn<typeof recognizePages>()
-      .mockResolvedValue([{ page: 1, text, confidence: 95, status: 'recognized' }]);
+      .mockResolvedValue([{ page: 1, text, confidence: 95, status: 'recognized', preview: null }]);
     const { result } = await scannedHook(recognize, allScanned);
     const error = result.current.state;
     expect(error.phase === 'error' && error.ocr).toBeTruthy();
@@ -262,6 +270,105 @@ describe('optional browser OCR in the flow', () => {
     expect(ready.phase === 'ready' && ready.readiness.request.ocrPages).toEqual([1]);
     act(() => {
       result.current.discardOcr();
+    });
+  });
+});
+
+describe('OCR review fixes in the flow', () => {
+  const source = new Blob(['%PDF-1.7']);
+  const threePages: ExtractedDocument = {
+    fileName: 'umowa.pdf',
+    fileBytes: 1000,
+    pageCount: 3,
+    pages: [
+      { page: 1, text },
+      { page: 2, text: '' },
+      { page: 3, text: '' },
+    ],
+    pagesWithoutText: [2, 3],
+    source,
+  };
+  const result = (page: number, value: string): OcrPageResult => ({
+    page,
+    text: value,
+    confidence: 80,
+    status: /\p{L}/u.test(value) ? 'recognized' : 'unreadable',
+    preview: null,
+  });
+
+  async function hook(recognize: typeof recognizePages) {
+    const h = renderHook(() =>
+      useAnalysisFlow({
+        analyze: vi.fn<typeof analyzeDocument>(),
+        extract: () => Promise.resolve(threePages),
+        recognize,
+      }),
+    );
+    await act(() => h.result.current.selectFile(pdfFile));
+    return h;
+  }
+
+  it('two OCR passes send ocrPages [2, 3]; the second pass only reads the remaining page', async () => {
+    const recognize = vi
+      .fn<typeof recognizePages>()
+      .mockResolvedValueOnce([result(2, 'Aneks nr 1.'), result(3, '')])
+      .mockResolvedValueOnce([result(3, 'Załącznik nr 2.')]);
+    const { result: r } = await hook(recognize);
+    await act(() => r.current.startOcr());
+    act(() => {
+      r.current.acceptOcr();
+    });
+    await act(() => r.current.startOcr());
+    expect(recognize.mock.calls[1]?.[1]).toEqual([3]);
+    act(() => {
+      r.current.acceptOcr();
+    });
+    const state = r.current.state;
+    expect(state.phase === 'ready' && state.readiness.request.ocrPages).toEqual([2, 3]);
+    expect(state.phase === 'ready' && state.readiness.request.pagesWithoutText).toEqual([]);
+  });
+
+  it('edits recompute readiness; reset restores machine text; discard restores pre-OCR data', async () => {
+    const recognize = vi
+      .fn<typeof recognizePages>()
+      .mockResolvedValue([result(2, 'zmienić $ 5 ust. 2'), result(3, '')]);
+    const { result: r } = await hook(recognize);
+    await act(() => r.current.startOcr());
+    act(() => {
+      r.current.editOcr(2, 'zmienić § 5 ust. 2');
+      r.current.editOcr(3, 'Strona wpisana ręcznie.');
+    });
+    let state = r.current.state;
+    expect(state.phase === 'ocr-review' && state.readiness.request.pages[1]?.text).toBe(
+      'zmienić § 5 ust. 2',
+    );
+    expect(state.phase === 'ocr-review' && state.merged.ocrPages).toEqual([2, 3]);
+    expect(state.phase === 'ocr-review' && state.results[0]?.text).toBe('zmienić $ 5 ust. 2');
+    act(() => {
+      r.current.resetOcrPage(2);
+    });
+    state = r.current.state;
+    expect(state.phase === 'ocr-review' && state.readiness.request.pages[1]?.text).toBe(
+      'zmienić $ 5 ust. 2',
+    );
+    act(() => {
+      r.current.editOcr(2, 'Ą'.repeat(20_001));
+    });
+    state = r.current.state;
+    expect(state.phase === 'ocr-review' && state.readiness.problem).toBe('page-too-long');
+    act(() => {
+      r.current.acceptOcr(); // blocked by the limit, nothing truncated
+    });
+    expect(r.current.state.phase).toBe('ocr-review');
+    act(() => {
+      r.current.discardOcr();
+    });
+    state = r.current.state;
+    expect(state.phase === 'ready' && state.readiness.request).toEqual({
+      fileName: 'umowa.pdf',
+      pageCount: 3,
+      pages: threePages.pages,
+      pagesWithoutText: [2, 3],
     });
   });
 });

@@ -9,12 +9,12 @@ import { finishedSteps, flowSteps } from './lib/flowSteps';
 import type { HistoryEntry } from './lib/history';
 import { AI_NOTICE } from './lib/messages';
 import type { AnalysisResult } from './lib/schema';
-import { useAnalysisFlow } from './lib/useAnalysisFlow';
+import { newOcrPages, useAnalysisFlow } from './lib/useAnalysisFlow';
 import { useHistory, type HistoryStorageOption } from './lib/useHistory';
 
 export function App({ historyStorage }: { historyStorage?: HistoryStorageOption } = {}) {
-  const { state, selectFile, start, cancel, reset, startOcr, acceptOcr, discardOcr } =
-    useAnalysisFlow();
+  const flow = useAnalysisFlow();
+  const { state, selectFile, start, cancel, reset, startOcr, acceptOcr, discardOcr } = flow;
   const history = useHistory(historyStorage);
   const [opened, setOpened] = useState<HistoryEntry | null>(null);
   const saved = useRef<AnalysisResult | null>(null);
@@ -98,7 +98,7 @@ export function App({ historyStorage }: { historyStorage?: HistoryStorageOption 
             onAnalyze={start}
             onReset={reset}
             onOcr={
-              state.doc.pagesWithoutText.length > 0 && state.doc.source && !state.doc.ocrPages
+              state.doc.pagesWithoutText.length > 0 && state.doc.source
                 ? () => void startOcr()
                 : null
             }
@@ -120,8 +120,11 @@ export function App({ historyStorage }: { historyStorage?: HistoryStorageOption 
         {!opened && state.phase === 'ocr-review' && (
           <OcrReview
             results={state.results}
+            edits={state.edits}
             readiness={state.readiness}
-            recovered={state.merged.ocrPages ?? []}
+            recovered={newOcrPages(state)}
+            onEdit={flow.editOcr}
+            onResetPage={flow.resetOcrPage}
             onAccept={acceptOcr}
             onDiscard={discardOcr}
           />
