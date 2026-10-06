@@ -318,6 +318,13 @@ def adversarial_cases() -> list[dict]:
         ),
     ]
     out = [run_case(name, request_for(texts), scenarios) for name, texts, scenarios in cases]
+    # Browser OCR text on page 2 (page 3 still without text): marked in the prompt, in the result.
+    ocr = request_for([
+        "UMOWA NR 9/2026 zawarta dnia 02.04.2026 r. pomiędzy stronami. " * 4,
+        "ANEKS NR 1\nWynagrodzenie netto: 48 750,00 zł\nTermin płatności: 30 czerwca 2026 r.",
+        "",
+    ])  # fmt: skip
+    out.append(run_case("ocr-page", ocr | {"ocrPages": [2]}, {"all": p}))
     many = " ".join(f"{i} 000,00 zł." for i in range(1, 420))
     out.append(run_case("too-many-candidates", request_for(["Kwoty " + many]), {}))
     return out

@@ -40,7 +40,8 @@ export function markDocument(request: AnalyzeRequest, candidates: Candidate[]): 
     for (const c of sorted) {
       text = `${text.slice(0, c.start)}⟦${c.kind === 'amount' ? 'A' : 'D'}${c.id}⟧${text.slice(c.start)}`;
     }
-    parts.push(`<page number="${page.page}">\n${neutralize(text)}\n</page>`);
+    const source = request.ocrPages.includes(page.page) ? ' source="ocr"' : '';
+    parts.push(`<page number="${page.page}"${source}>\n${neutralize(text)}\n</page>`);
   }
   parts.push('</document>');
   return parts.join('\n');
@@ -53,9 +54,14 @@ export interface Message {
 
 export function buildMessages(request: AnalyzeRequest, candidates: Candidate[]): Message[] {
   const missing = request.pagesWithoutText;
-  const coverage = missing.length
+  let coverage = missing.length
     ? `Pages without extractable text (not analysed): ${missing.join(', ')}.`
     : 'All pages have extractable text.';
+  if (request.ocrPages.length) {
+    coverage +=
+      ` Text of pages ${request.ocrPages.join(', ')} (marked source="ocr") was ` +
+      "recognised by OCR in the user's browser and may contain recognition errors.";
+  }
   const user =
     `The document has ${request.pageCount} pages. ${coverage}\n` +
     'Analyse it according to the rules. Return only the JSON object.\n\n' +
@@ -371,6 +377,7 @@ export function assemble(request: AnalyzeRequest, selection: Selection): Analysi
       complete: request.pagesWithoutText.length === 0,
       pagesWithoutText: [...request.pagesWithoutText],
       titleFallback: !title,
+      ...(request.ocrPages.length ? { ocrPages: [...request.ocrPages] } : {}),
     },
   };
   const parsed = AnalysisResultSchema.safeParse(candidate);

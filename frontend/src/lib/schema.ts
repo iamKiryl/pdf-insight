@@ -46,6 +46,8 @@ export const AnalysisInfoSchema = z.strictObject({
   complete: z.boolean(),
   pagesWithoutText: z.array(z.number().int()),
   titleFallback: z.boolean(),
+  /** Pages analysed from browser OCR text (present only when there were any). */
+  ocrPages: z.array(z.number().int()).min(1).optional(),
 });
 
 export const AnalysisResultSchema = z
@@ -74,6 +76,15 @@ export const AnalysisResultSchema = z
         message: 'must be ascending, unique and within 1..pages',
       });
     }
+    const ocr = info.ocrPages ?? [];
+    const ocrSorted = ocr.every((page, i) => i === 0 || page > (ocr[i - 1] ?? 0));
+    if (!ocrSorted || ocr.some((p) => p < 1 || p > result.document.pages || pages.includes(p))) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['analysis', 'ocrPages'],
+        message: 'must be ascending, unique, within 1..pages and not in pagesWithoutText',
+      });
+    }
     if (info.complete !== (pages.length === 0)) {
       ctx.addIssue({
         code: 'custom',
@@ -100,4 +111,6 @@ export interface AnalyzeRequest {
   pageCount: number;
   pages: PageText[];
   pagesWithoutText: number[];
+  /** Pages whose text comes from browser OCR (sent only when non-empty). */
+  ocrPages?: number[];
 }

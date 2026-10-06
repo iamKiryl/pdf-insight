@@ -3198,6 +3198,173 @@
   ]
  },
  {
+  "name": "ocr-page",
+  "request": {
+   "fileName": "dokument.pdf",
+   "pageCount": 3,
+   "pages": [
+    {
+     "page": 1,
+     "text": "UMOWA NR 9/2026 zawarta dnia 02.04.2026 r. pomiędzy stronami. UMOWA NR 9/2026 zawarta dnia 02.04.2026 r. pomiędzy stronami. UMOWA NR 9/2026 zawarta dnia 02.04.2026 r. pomiędzy stronami. UMOWA NR 9/2026 zawarta dnia 02.04.2026 r. pomiędzy stronami. "
+    },
+    {
+     "page": 2,
+     "text": "ANEKS NR 1\nWynagrodzenie netto: 48 750,00 zł\nTermin płatności: 30 czerwca 2026 r."
+    },
+    {
+     "page": 3,
+     "text": ""
+    }
+   ],
+   "pagesWithoutText": [
+    3
+   ],
+   "ocrPages": [
+    2
+   ]
+  },
+  "candidates": [
+   {
+    "id": 1,
+    "kind": "date",
+    "page": 1,
+    "value": null,
+    "currency": null,
+    "date": "2026-04-02",
+    "context": "s. 1: UMOWA NR 9/2026 zawarta dnia »02.04.2026« r. pomiędzy stronami."
+   },
+   {
+    "id": 2,
+    "kind": "date",
+    "page": 1,
+    "value": null,
+    "currency": null,
+    "date": "2026-04-02",
+    "context": "s. 1: UMOWA NR 9/2026 zawarta dnia »02.04.2026« r. pomiędzy stronami."
+   },
+   {
+    "id": 3,
+    "kind": "date",
+    "page": 1,
+    "value": null,
+    "currency": null,
+    "date": "2026-04-02",
+    "context": "s. 1: UMOWA NR 9/2026 zawarta dnia »02.04.2026« r. pomiędzy stronami."
+   },
+   {
+    "id": 4,
+    "kind": "date",
+    "page": 1,
+    "value": null,
+    "currency": null,
+    "date": "2026-04-02",
+    "context": "s. 1: UMOWA NR 9/2026 zawarta dnia »02.04.2026« r. pomiędzy stronami."
+   },
+   {
+    "id": 5,
+    "kind": "amount",
+    "page": 2,
+    "value": 48750.0,
+    "currency": "PLN",
+    "date": null,
+    "context": "s. 2: [ANEKS NR 1] Wynagrodzenie netto: »48 750,00 zł«"
+   },
+   {
+    "id": 6,
+    "kind": "date",
+    "page": 2,
+    "value": null,
+    "currency": null,
+    "date": "2026-06-30",
+    "context": "s. 2: [ANEKS NR 1] Termin płatności: »30 czerwca 2026« r."
+   }
+  ],
+  "userMessage": "The document has 3 pages. Pages without extractable text (not analysed): 3. Text of pages 2 (marked source=\"ocr\") was recognised by OCR in the user's browser and may contain recognition errors.\nAnalyse it according to the rules. Return only the JSON object.\n\n<document>\n<page number=\"1\">\nUMOWA NR 9/2026 zawarta dnia ⟦D1⟧02.04.2026 r. pomiędzy stronami. UMOWA NR 9/2026 zawarta dnia ⟦D2⟧02.04.2026 r. pomiędzy stronami. UMOWA NR 9/2026 zawarta dnia ⟦D3⟧02.04.2026 r. pomiędzy stronami. UMOWA NR 9/2026 zawarta dnia ⟦D4⟧02.04.2026 r. pomiędzy stronami. \n</page>\n<page number=\"2\" source=\"ocr\">\nANEKS NR 1\nWynagrodzenie netto: ⟦A5⟧48 750,00 zł\nTermin płatności: ⟦D6⟧30 czerwca 2026 r.\n</page>\n<page number=\"3\" status=\"no-extractable-text\"></page>\n</document>",
+  "scenarios": [
+   {
+    "label": "all",
+    "payload": {
+     "insufficientContent": false,
+     "language": "pl",
+     "type": "umowa",
+     "title": "Umowa testowa",
+     "mainDateId": 1,
+     "summary": "Umowa została zawarta. Wynagrodzenie jest ustalone. Strony podpisały umowę.",
+     "keyPoints": [
+      "Umowa jest zawarta.",
+      "Wynagrodzenie jest netto.",
+      "Strony są dwie."
+     ],
+     "organizations": [],
+     "people": [],
+     "keywords": [
+      "umowa"
+     ],
+     "amountIds": [
+      5
+     ],
+     "dateIds": [
+      1,
+      2,
+      3,
+      4,
+      6
+     ]
+    },
+    "result": {
+     "document": {
+      "fileName": "dokument.pdf",
+      "pages": 3,
+      "language": "pl",
+      "type": "umowa",
+      "title": "Umowa testowa",
+      "date": "2026-04-02"
+     },
+     "summary": "Umowa została zawarta. Wynagrodzenie jest ustalone. Strony podpisały umowę.",
+     "keyPoints": [
+      "Umowa jest zawarta.",
+      "Wynagrodzenie jest netto.",
+      "Strony są dwie."
+     ],
+     "entities": {
+      "organizations": [],
+      "people": []
+     },
+     "amounts": [
+      {
+       "value": 48750.0,
+       "currency": "PLN",
+       "context": "s. 2: [ANEKS NR 1] Wynagrodzenie netto: »48 750,00 zł«"
+      }
+     ],
+     "dates": [
+      {
+       "date": "2026-04-02",
+       "context": "s. 1: UMOWA NR 9/2026 zawarta dnia »02.04.2026« r. pomiędzy stronami."
+      },
+      {
+       "date": "2026-06-30",
+       "context": "s. 2: [ANEKS NR 1] Termin płatności: »30 czerwca 2026« r."
+      }
+     ],
+     "keywords": [
+      "umowa"
+     ],
+     "analysis": {
+      "complete": false,
+      "pagesWithoutText": [
+       3
+      ],
+      "titleFallback": false,
+      "ocrPages": [
+       2
+      ]
+     }
+    }
+   }
+  ]
+ },
+ {
   "name": "too-many-candidates",
   "request": {
    "fileName": "dokument.pdf",

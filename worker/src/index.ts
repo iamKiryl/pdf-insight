@@ -181,6 +181,7 @@ async function analyzeRoute(
       ...fields,
       pageCount: parsed.pageCount,
       pagesWithoutText: parsed.pagesWithoutText.length,
+      ocrPages: parsed.ocrPages.length,
       textChars: totalChars(parsed),
     };
     if (!env.AI) throw new ApiError('SERVICE_MISCONFIGURED');

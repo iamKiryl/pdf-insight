@@ -37,6 +37,8 @@ export const AnalyzeRequestSchema = z
     pageCount: z.int().min(1).max(MAX_PAGES),
     pages: z.array(PageTextSchema).max(MAX_PAGES),
     pagesWithoutText: z.array(z.int()).max(MAX_PAGES),
+    /** Pages whose text the user accepted from browser OCR (optional; absent = none). */
+    ocrPages: z.array(z.int()).max(MAX_PAGES).default([]),
   })
   .superRefine((request, ctx) => {
     if (request.pages.length !== request.pageCount) {
@@ -51,6 +53,12 @@ export const AnalyzeRequestSchema = z
     const given = request.pagesWithoutText;
     if (expected.length !== given.length || expected.some((page, i) => page !== given[i])) {
       ctx.addIssue({ code: 'custom', message: 'pagesWithoutText does not match page texts' });
+      return;
+    }
+    const ocr = request.ocrPages;
+    const ordered = ocr.every((page, i) => i === 0 || page > (ocr[i - 1] ?? 0));
+    if (!ordered || ocr.some((p) => p < 1 || p > request.pageCount || given.includes(p))) {
+      ctx.addIssue({ code: 'custom', message: 'ocrPages must be ascending pages that have text' });
     }
   });
 

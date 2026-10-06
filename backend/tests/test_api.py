@@ -432,6 +432,7 @@ def test_logs_usage_on_failure_and_ignores_malformed_usage(capsys):
         "mode": "single",
         "pageCount": 2,
         "pagesWithoutText": 0,
+        "ocrPages": 0,
         "textChars": line["textChars"],
         "modelCallsStarted": 2,
         "modelCallsCompleted": 2,

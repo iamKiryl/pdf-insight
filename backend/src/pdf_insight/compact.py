@@ -154,7 +154,8 @@ def mark_document(request: AnalyzeRequest, candidates: list[Candidate]) -> str:
         for candidate in sorted(by_page.get(page.page, []), key=lambda c: c.start, reverse=True):
             tag = "A" if candidate.kind == "amount" else "D"
             text = f"{text[: candidate.start]}⟦{tag}{candidate.id}⟧{text[candidate.start :]}"
-        parts.append(f'<page number="{page.page}">\n{neutralize(text)}\n</page>')
+        source = ' source="ocr"' if page.page in request.ocrPages else ""
+        parts.append(f'<page number="{page.page}"{source}>\n{neutralize(text)}\n</page>')
     parts.append("</document>")
     return "\n".join(parts)
 
@@ -166,6 +167,11 @@ def build_messages(request: AnalyzeRequest, candidates: list[Candidate]) -> list
         if missing
         else "All pages have extractable text."
     )
+    if request.ocrPages:
+        coverage += (
+            f' Text of pages {", ".join(map(str, request.ocrPages))} (marked source="ocr") was '
+            "recognised by OCR in the user's browser and may contain recognition errors."
+        )
     user = (
         f"The document has {request.pageCount} pages. {coverage}\n"
         "Analyse it according to the rules. Return only the JSON object.\n\n"
@@ -367,6 +373,7 @@ def assemble(request: AnalyzeRequest, selection: Selection) -> AnalysisResult:
             complete=not request.pagesWithoutText,
             pagesWithoutText=list(request.pagesWithoutText),
             titleFallback=not title,
+            ocrPages=list(request.ocrPages) or None,
         ).model_dump(),
     }
     try:

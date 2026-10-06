@@ -8,7 +8,7 @@ ALLOWED_FIELDS = frozenset(
         "event", "outcome", "status", "ms", "attempts", "pageCount", "pagesWithoutText",
         "textChars", "model", "promptVersion", "modelCallsStarted", "modelCallsCompleted",
         "usageReportedCalls", "usageComplete", "reportedPromptTokens", "reportedCompletionTokens",
-        "mode", "chunks", "duplicateFacts",
+        "mode", "chunks", "duplicateFacts", "ocrPages",
     }
 )  # fmt: skip
 

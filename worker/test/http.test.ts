@@ -171,6 +171,15 @@ describe('rate limiting and request validation', () => {
     expect(ai.calls).toHaveLength(0);
   });
 
+  it('ocrPages must name pages that have text; absent means none', async () => {
+    const e = env(new FakeAI([]));
+    for (const ocrPages of [[0], [2, 2], [99], ['1']]) {
+      expect(await code(await call(post({ ...offer.request, ocrPages }), e))).toBe(
+        'INVALID_REQUEST',
+      );
+    }
+  });
+
   it('unsupported model or mode fails clearly', async () => {
     expect(
       await code(
@@ -197,6 +206,15 @@ describe('analysis loop (fake AI)', () => {
       type: 'json_schema',
       json_schema: expect.any(Object) as unknown,
     });
+  });
+
+  it('OCR pages are marked in the prompt and in the result metadata', async () => {
+    const ai = new FakeAI([oracle.payload]);
+    const response = await call(post({ ...offer.request, ocrPages: [1] }), env(ai));
+    const body = (await response.json()) as { analysis: { ocrPages?: number[] } };
+    expect(body.analysis.ocrPages).toEqual([1]);
+    const user = (ai.calls[0]?.messages as { content: string }[])[1]?.content ?? '';
+    expect(user).toContain('<page number="1" source="ocr">');
   });
 
   it('corrects invalid output exactly once', async () => {

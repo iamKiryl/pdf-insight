@@ -56,6 +56,8 @@ def _parse_request(body: bytes, settings: Settings) -> AnalyzeRequest:
         raise ApiError("DOCUMENT_TOO_LONG")  # explicit; text is never truncated
     if len(request.pagesWithoutText) == request.pageCount:
         raise ApiError("NO_TEXT_LAYER")
+    if request.ocrPages and settings.ai_mode != "compact":
+        raise ApiError("INVALID_REQUEST")  # only compact tells the model which text is OCR
     if request.total_letters < MIN_TOTAL_LETTERS:
         raise ApiError("INSUFFICIENT_CONTENT")
     return request
@@ -107,6 +109,7 @@ def create_app(runtime_factory: RuntimeFactory) -> Any:
             fields |= {
                 "pageCount": parsed.pageCount,
                 "pagesWithoutText": len(parsed.pagesWithoutText),
+                "ocrPages": len(parsed.ocrPages),
                 "textChars": parsed.total_chars,
             }
             if runtime.ai is None:

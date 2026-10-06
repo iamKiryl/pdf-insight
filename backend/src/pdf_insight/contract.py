@@ -4,7 +4,15 @@ import datetime as dt
 import re
 from typing import Annotated, Literal, Self
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+    model_validator,
+)
 
 from .codes import CURRENCIES, LANGUAGES
 from .sentences import sentence_count_within
@@ -97,6 +105,8 @@ class AnalyzeRequest(_Strict):
     pageCount: int = Field(ge=1, le=MAX_PAGES)
     pages: list[PageText] = Field(max_length=MAX_PAGES)
     pagesWithoutText: list[int] = Field(max_length=MAX_PAGES)
+    # Pages whose text the user accepted from browser OCR (optional; absent = none).
+    ocrPages: list[int] = Field(default_factory=list, max_length=MAX_PAGES)
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -107,6 +117,11 @@ class AnalyzeRequest(_Strict):
         expected = [p.page for p in self.pages if not has_letter(p.text)]
         if self.pagesWithoutText != expected:
             raise ValueError("pagesWithoutText does not match page texts")
+        ocr = self.ocrPages
+        if ocr != sorted(set(ocr)) or any(
+            p < 1 or p > self.pageCount or p in self.pagesWithoutText for p in ocr
+        ):
+            raise ValueError("ocrPages must be ascending, unique pages that have text")
         return self
 
     @property
@@ -150,6 +165,15 @@ class AnalysisInfo(_Strict):
     complete: bool
     pagesWithoutText: list[int]
     titleFallback: bool
+    # Present only when some analysed text came from browser OCR.
+    ocrPages: list[int] | None = Field(default=None, min_length=1)
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_ocr(self, handler: SerializerFunctionWrapHandler) -> dict:
+        data = handler(self)
+        if data.get("ocrPages") is None:
+            data.pop("ocrPages", None)
+        return data
 
 
 class AnalysisResult(_Strict):
@@ -172,4 +196,11 @@ class AnalysisResult(_Strict):
             raise ValueError("pagesWithoutText must be ascending, unique and within 1..pages")
         if info.complete != (not pages):
             raise ValueError("analysis.complete must be true iff no pages lack text")
+        ocr = info.ocrPages or []
+        if ocr != sorted(set(ocr)) or any(
+            p < 1 or p > self.document.pages or p in pages for p in ocr
+        ):
+            raise ValueError(
+                "ocrPages must be ascending, unique, within 1..pages, not without text"
+            )
         return self

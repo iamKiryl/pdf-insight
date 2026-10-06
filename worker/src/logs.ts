@@ -1,7 +1,8 @@
 /** Operational logs: whitelisted numeric/label fields only, never document text (logs.py). */
 
 const EVENT_FIELDS = new Set([
-  'event', 'outcome', 'status', 'ms', 'attempts', 'pageCount', 'pagesWithoutText', 'textChars',
+  'event', 'outcome', 'status', 'ms', 'attempts', 'pageCount', 'pagesWithoutText', 'ocrPages',
+  'textChars',
   'model', 'promptVersion', 'modelCallsStarted', 'modelCallsCompleted', 'usageReportedCalls',
   'usageComplete', 'reportedPromptTokens', 'reportedCompletionTokens', 'mode', 'runtime',
 ]); // prettier-ignore
