@@ -11,7 +11,7 @@ user's step.
 | Repository | https://github.com/iamKiryl/pdf-insight |
 | Frontend (Pages) | commit `1b1ddd7`, deployed by CI run [37456785150](https://github.com/iamKiryl/pdf-insight/actions/runs/37456785150) (13:31) |
 | Backend | Cloudflare Worker `pdf-insight-api` (TypeScript, compact, Llama 3.3 70B), version `7f5eed60-d76e-4595-9371-3c2de449c8b4` (app code `1fd7999`, 13:29), https://pdf-insight-api.pdf-insight-api.workers.dev |
-| Last successful CI | run [37457195586](https://github.com/iamKiryl/pdf-insight/actions/runs/37457195586) on `c357017` (frontend, Python, TS Worker checks, build); this handoff commit runs CI again |
+| Last successful CI | run [37458017167](https://github.com/iamKiryl/pdf-insight/actions/runs/37458017167) on `a58e416` (frontend, Python, TS Worker checks, build; docs-only change after the deployed `1b1ddd7`) |
 | Availability intent | 14 days, until 2026-10-20, on Cloudflare Workers Free + GitHub Pages; no paid plan, **no availability guarantee** |
 
 ## Requirements (docs/PLAN.md)

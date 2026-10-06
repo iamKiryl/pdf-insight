@@ -7,8 +7,8 @@ organizations, people, amounts, dates, keywords) as validated JSON you can downl
   2026-10-20; availability on the Free plan is not guaranteed)
 - **Repository:** https://github.com/iamKiryl/pdf-insight
 - **Backend:** https://pdf-insight-api.pdf-insight-api.workers.dev (`/api/health`)
-- **Last successful CI:** [run 37457195586](https://github.com/iamKiryl/pdf-insight/actions/runs/37457195586)
-  (`c357017`, all checks); Pages deployed by [run 37456785150](https://github.com/iamKiryl/pdf-insight/actions/runs/37456785150) (`1b1ddd7`)
+- **Last successful CI:** [run 37458017167](https://github.com/iamKiryl/pdf-insight/actions/runs/37458017167)
+  (`a58e416`, all checks); Pages deployed by [run 37456785150](https://github.com/iamKiryl/pdf-insight/actions/runs/37456785150) (`1b1ddd7`)
 - **Handoff summary (results, open requirements):** [docs/HANDOFF.md](docs/HANDOFF.md)
 
 ![Public demo: fresh analysis of the 12-page sample contract](docs/screenshots/public-demo-ts-result.png)
