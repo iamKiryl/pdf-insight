@@ -614,3 +614,23 @@ Reviewed c357017, repeated-pass provenance and correction cleanup; independently
 tests and typecheck (pass). README still depicts Python/chunked production and an old TS version.
 Prepared FINAL_HANDOFF_CHECK.md: predeclared OCR-aware oracle, one quota-bounded public OCR analysis,
 accurate README and delivery checklist. No email/form submission, no claim that F08 or CPU is solved.
+
+## 2026-10-06 — Final handoff documentation (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/FINAL_HANDOFF_CHECK.md. Проверь один публичный
+анализ договора с исправленным OCR по заранее подготовленным ожиданиям. Обнови README под
+фактическую архитектуру и подготовь HANDOFF с результатами и незакрытыми требованиями. Соблюдай
+бюджет вызовов. Ничего не отправляй рекрутеру. Финализируй без AI-вызовов и изменений приложения.
+Исправь README: production — TypeScript Worker/Zod/compact, OCR опубликован. Кратко перечисли
+ограничения: F-08 не готов, OCR→AI не проверен, время 26,5–30,7 с, CPU 37–39 мс выше Free-лимита.
+Добавь ссылки на демо, репозиторий и последний успешный CI. Закоммить и push документацию. Ничего
+не отправляй рекрутеру.»
+
+- The prompt's later instruction (no AI calls, no app changes) took precedence over the task
+  file's optional public OCR analysis: 0 model calls; OCR → AI stays unverified.
+- README rewritten for the deployed architecture (TS Worker/Zod/compact, Python as reference,
+  chunked as unaccepted experiment, OCR flow, links, last CI, screenshot origins, limits); local
+  TS Worker commands checked against `worker/package.json` and `wrangler dev --help`.
+  docs/HANDOFF.md added; stale "not executed" deployment note in worker/README.md fixed.
+- Nothing sent to the recruiter.
+

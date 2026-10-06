@@ -52,6 +52,8 @@ organisation legal-form resolution, too many candidates, the offer and the 12-pa
 - `casefold` is approximated by `toLowerCase` plus `ß → ss`.
 - Unknown `AI_MODE` or model fails closed with `SERVICE_MISCONFIGURED` (Python falls back to
   `single` for an unknown mode). Only `@cf/meta/llama-3.3-70b-instruct-fp8-fast` is allowed.
+- `ocrPages` is accepted only in compact mode here (the only mode); Python's experimental
+  single/chunked modes reject it.
 
 ## Local performance profile (not production CPU)
 
@@ -65,6 +67,7 @@ npx wrangler dev --config wrangler.profile.jsonc --port 8791
 Results are in docs/STATUS.md. Local wall time is not Cloudflare CPU time; the AI binding,
 network wait and the timeout path are not exercised.
 
-## Deployment (NOT executed — after review only)
+## Deployment
 
-See docs/RUNTIME.md for the exact command, the replacement semantics and the rollback.
+Deployed as `pdf-insight-api`, current version `7f5eed60-d76e-4595-9371-3c2de449c8b4` (optional
+`ocrPages` for browser OCR text). Command, rollback targets and order: docs/RUNTIME.md.

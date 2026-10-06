@@ -1,6 +1,8 @@
-# Current snapshot — 2026-10-06, 13:34 Warsaw (OCR fixes published)
+# Current snapshot — 2026-10-06, 13:46 Warsaw (final handoff, see docs/HANDOFF.md)
 
-Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 1 h 10 min left).
+Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 58 min left). Final checkpoint
+done without AI calls and without application changes (user instruction): the planned public
+OCR → AI analysis was **not run**, so OCR text → AI remains unverified.
 
 | Item | State |
 |---|---|
