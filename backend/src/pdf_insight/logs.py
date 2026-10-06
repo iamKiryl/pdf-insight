@@ -28,6 +28,7 @@ CALL_FIELDS = frozenset(
         "completionTokens",
         "finishReason",
         "outputBytes",
+        "providerCode",
     }
 )
 MAX_PROBLEMS = 10

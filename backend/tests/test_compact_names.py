@@ -118,3 +118,13 @@ def test_marker_standing_in_for_a_value_is_invalid_output():
     with pytest.raises(InvalidModelOutput) as info:
         parse_selection(body, by_id, REQUEST)
     assert info.value.problems == ["keyPoints.0: contains an internal marker; write plain text"]
+
+
+def test_provider_failure_logs_only_the_numeric_code(capsys):
+    from pdf_insight.runtime import AIProviderError
+
+    response = post(SequenceAI(AIProviderError("unavailable", 5006)))
+    assert response.json()["error"]["code"] == "AI_UNAVAILABLE"
+    call = next(json.loads(x) for x in capsys.readouterr().out.splitlines()
+                if '"model_call"' in x)  # fmt: skip
+    assert (call["outcome"], call["providerCode"]) == ("provider_unavailable", 5006)

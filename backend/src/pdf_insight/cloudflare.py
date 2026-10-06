@@ -9,7 +9,7 @@ from collections.abc import MutableMapping
 from typing import Any
 
 from .config import load_settings
-from .runtime import AIProviderError, Runtime, classify_provider_error
+from .runtime import AIProviderError, Runtime, classify_provider_error, provider_error_code
 
 
 def _to_py(value: Any) -> Any:
@@ -37,7 +37,10 @@ class WorkersAIClient:
         try:
             result = await self._binding.run(model, inputs)
         except Exception as exc:  # JsException from the binding; message is classified, not logged
-            raise AIProviderError(classify_provider_error(str(exc))) from None
+            text = str(exc)
+            raise AIProviderError(
+                classify_provider_error(text), provider_error_code(text)
+            ) from None
         return _to_py(result)
 
 

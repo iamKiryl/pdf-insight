@@ -186,3 +186,11 @@ def test_middleware_never_reads_body_outside_analyze(method, path):
     assert reads == 0
     expected = {"/api/analyze/": 404, "/nope": 404, "/api/analyze": 405, "/api/health": 200}[path]
     assert sent[0]["status"] == expected
+
+
+def test_provider_error_code_is_the_number_only():
+    from pdf_insight.runtime import provider_error_code
+
+    assert provider_error_code("AiError: 5006: Invalid input: something 12 345") == 5006
+    assert provider_error_code("AiError: 3040: Capacity temporarily exceeded") == 3040
+    assert provider_error_code("network down") is None

@@ -432,6 +432,8 @@ async def analyze_compact(
             done("timeout")
             raise ApiError("AI_TIMEOUT") from None
         except AIProviderError as exc:
+            if exc.code is not None:
+                record["providerCode"] = exc.code
             done(f"provider_{exc.kind}")
             if exc.kind == "quota":
                 raise ApiError("AI_QUOTA_EXCEEDED") from None
