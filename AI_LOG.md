@@ -580,3 +580,11 @@ Prompt (human → Claude, verbatim): «Выполни docs/NEXT_BROWSER_OCR.md. 
   `--screenshot` Chrome did not exit; killed after the PNG was written.
 - No Workers AI call, no deployment, no publication. Sample OCR text and screenshots in `.local/`.
 
+
+## 2026-10-06 — Browser OCR review (Codex)
+
+Reviewed b4c46d8; frontend 127 tests/typecheck pass. Found lost provenance on repeated partial OCR,
+read-only review unable to correct observed section-symbol/dollar mistakes, and overbroad immediate
+cleanup claim during initialization/late render. Prepared REVIEW_OCR_FIXES.md: preserve provenance,
+manual correction (no dollar heuristics), cleanup regression, actual page-11 candidate verification,
+conditional backend-first publication with no AI calls. CPU/latency/F08 remain open.
