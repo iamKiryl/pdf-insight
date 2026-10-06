@@ -1,12 +1,12 @@
 # Deployment
 
-## Current state (2026-10-06, 11:30 Warsaw)
+## Current state (2026-10-06, 11:55 Warsaw)
 
 | Item | State |
 |---|---|
-| Frontend | https://iamkiryl.github.io/pdf-insight/ (GitHub Pages, CI run 37428051869, commit `85112f8`; includes F-09 local history) |
+| Frontend | https://iamkiryl.github.io/pdf-insight/ (GitHub Pages, CI run 37445769851, commit `54515a5`; F-09 history incl. the storage-full fix) |
 | Backend | https://pdf-insight-api.pdf-insight-api.workers.dev, version `a4695cc8` from `c775866`, 70B model, `AI_MODE=compact` — unchanged since the first deployment |
-| Not yet deployed | `127274b` (history storage fix, frontend), `488927e` (per-request memo, CPU), `3ff21cf` (numeric provider error code in logs) — waiting for review |
+| Not yet deployed (backend) | Python `488927e` (CPU memo), `3ff21cf` (numeric provider error code); the TypeScript Worker candidate `worker/` (docs/RUNTIME.md) — waiting for review |
 | Production 429 | **observed** by Codex on 2026-10-06 ~06:59 UTC with invalid-body POSTs (no model calls); per-location and eventually consistent, not an exact cap |
 | CPU | observed with `wrangler tail`: analyze (timeout) 303 ms; no-AI requests 16–49 ms; health 6–18 ms — above the 10 ms Free limit (see "Stability checkpoint" in docs/STATUS.md) |
 | Public acceptance | not achieved: the one public analysis timed out (AI_TIMEOUT 40 s) |

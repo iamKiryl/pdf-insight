@@ -454,3 +454,22 @@ keep Python as a parity reference/evaluator, retain server-side validation and F
 Official JSON Mode list still names the non-fp8 Llama 3.1 8B, but its linked card returns 404;
 require catalogue confirmation before a new quota-bounded experiment. No inference or deployment
 by Codex. Backend migration will be reviewed before replacing the live Worker.
+
+## 2026-10-06 — Free runtime checkpoint: compact TypeScript Worker (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/NEXT_FREE_RUNTIME.md. Реализуй compact TypeScript
+Worker, сохрани контракт и защитные проверки, сравни результаты с Python и измерь
+производительность. Проверь доступность указанной модели; эксперимент — только в установленном
+бюджете. Backend production пока не заменяй. Обнови отчёт и подготовь изменения к ревью.»
+
+- Model check first, without inference: `@cf/meta/llama-3.1-8b-instruct` absent (catalogue, 6002)
+  → blocker recorded, 0 calls.
+- `4b2db6b`: golden fixtures from Python (generator + freshness test). `191a1d8`: TS Worker; all 89
+  parity tests passed on the first run (including the 116 sample candidates and the 25 KB marked
+  prompt); a deliberate constant change was used to confirm the tests are not vacuous. Own slips
+  fixed before committing: a simplified number regex in the header check (would miss "1.5"),
+  `\-` escapes invalid in Unicode regexes, two bundled Zod copies (1.6 MB → 1.08 MB via alias),
+  missing Node types for tests, deprecated `baseUrl`.
+- Local workerd profile with a fake AI: ≈ 4.2 ms per warm full request (Python pipeline 23.5 ms).
+- `54515a5`: CI worker job; push run and dispatch run green; frontend republished from `54515a5`
+  (history fix). Backend production untouched.

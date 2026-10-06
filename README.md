@@ -36,6 +36,14 @@ be reopened, deleted or cleared without contacting the server.
 Dark interface in the visual language of the recruitment brief (near-black panels, one lime
 accent, numbered monospace labels), Polish UI, four-step indicator driven by the real flow state.
 
+## Backend runtimes
+
+- `backend/` — Python Worker (FastAPI/Pydantic on Pyodide), **deployed**; reference implementation
+  and evaluation tooling (evaluator, oracle, parity fixtures).
+- `worker/` — compact-mode TypeScript Worker, **candidate, not deployed**: same API and
+  contract, parity with Python on all golden cases, ≈ 4.2 ms per warm request in local workerd
+  (vs 23.5 ms for the Python pipeline). Deploy and rollback commands: [docs/RUNTIME.md](docs/RUNTIME.md).
+
 ## Architecture
 
 ```

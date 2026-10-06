@@ -639,3 +639,12 @@ See docs/STATUS.md (snapshot): CPython and local workerd profiles of the compact
 rebuilt run-J answer, and Cloudflare `wrangler tail` CPU for no-AI requests (health 6–18 ms,
 invalid full-size analyze 16–49 ms). Evidence: `.local/live/cpu-profile-*.txt`,
 `.local/live/workerd-profile-*.txt`, `.local/live/deployed/M-cpu-no-ai/summary.json`.
+
+# Free runtime checkpoint — 2026-10-06 (docs/NEXT_FREE_RUNTIME.md)
+
+Model availability check without inference (`wrangler ai models list`, `wrangler ai models schema`):
+`@cf/meta/llama-3.1-8b-instruct` is not in the account catalogue (69 models) and its schema
+request returns 6002 "Model schema not found"; only `@cf/meta/llama-3.1-8b-instruct-fp8` exists,
+already shown incompatible with JSON Schema (runs N/N2). The experiment is blocked: **0 provider
+calls** in this checkpoint (separate from N/N2), no other model tried, no public sample run.
+The TS Worker migration was verified offline only (parity and fake-AI profiling).

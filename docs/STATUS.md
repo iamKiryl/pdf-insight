@@ -1,24 +1,71 @@
-# Current snapshot — 2026-10-06, 11:30 Warsaw (stability checkpoint)
+# Current snapshot — 2026-10-06, 11:55 Warsaw (free runtime checkpoint)
 
-Deadline from the recruitment e-mail: 2026-10-06 14:44 Warsaw (docs/PLAN.md).
+Deadline recorded in docs/PLAN.md: 2026-10-06 14:44 Warsaw (≈ 2 h 50 min left at this snapshot).
 
 | Item | State |
 |---|---|
-| Public demo | https://iamkiryl.github.io/pdf-insight/ — **published, not accepted**: the one public analysis timed out (AI_TIMEOUT, 40 s) |
-| Repository | https://github.com/iamKiryl/pdf-insight (public) |
-| Backend | https://pdf-insight-api.pdf-insight-api.workers.dev — version `a4695cc8` (70B, compact), **unchanged in this checkpoint** |
-| Local commits not deployed | `127274b` history storage fix, `488927e` CPU memo, `3ff21cf` provider error code in logs, `18d9b55` 8B profile removed |
-| Checks | frontend lint, format, typecheck, **107** Vitest tests, Pages build; backend Ruff, **441** pytest |
+| Public demo | https://iamkiryl.github.io/pdf-insight/ — frontend from `54515a5` (CI run https://github.com/iamKiryl/pdf-insight/actions/runs/37445769851, includes the storage-full history fix) |
+| Backend (deployed) | Python Worker `pdf-insight-api`, version `a4695cc8` from `c775866`, 70B compact — **unchanged** |
+| Backend candidate | TypeScript Worker `worker/` (`191a1d8`), parity with Python, **not deployed** (docs/RUNTIME.md) |
+| Checks | frontend 107 Vitest + lint/format/typecheck/build; backend 444 pytest + Ruff; worker 103 Vitest + typecheck + bundle; all green in CI run 37445598624 |
+| Public acceptance | **not achieved**: the one public analysis (run L) timed out; Free CPU not verified for the deployed runtime |
 
-| Requirement | Implemented | Accepted on the public demo |
+Requirements (IDs as in docs/PLAN.md):
+
+| ID | Requirement | Code complete | Accepted on the public demo |
+|---|---|---|---|
+| F-01 | Drag & drop / chooser, PDF ≤ 10 MB | yes | yes (anonymous checks 2026-10-06) |
+| F-02 | Text layer extraction, pages without text | yes | yes (pdf.js worker, page 11 detected) |
+| F-03 | 3–5 sentence factual summary in the document language | yes (compact, 70B) | **no** — accepted locally (I, J) and via deployed backend + local frontend (K); public run L timed out |
+| F-04 | Structured data strictly by schema, one retry on invalid output | yes (Python deployed; TS candidate with parity) | partially — schema/validation verified; no successful public analysis |
+| F-05 | Readable result, JSON view and .json download | yes | yes for reopened history data (identical export); no fresh public analysis |
+| F-06 | Empty, loading, error and retry states | yes | yes (non-PDF error, AI timeout message with retry) |
+| F-07 | Public GitHub Pages demo | published | **not accepted** until a public analysis succeeds within the target |
+| F-08 | Long documents: chunking and merge (SHOULD) | **no** — compact rejects > 30 000 characters (explicit 413); chunked unvalidated | no |
+| F-09 | Local history (SHOULD) | yes (`abe5a21`, `127274b`) | yes (reopen/export without request; fix published in `54515a5`) |
+| F-10 | OCR (COULD) | **no** (warning only) | no |
+
+## Free runtime checkpoint (docs/NEXT_FREE_RUNTIME.md)
+
+**Parity oracle:** `backend/tools/parity_fixtures.py` (Python) → `worker/test/parity/` — 23
+synthetic/adversarial cases incl. 19 selection scenarios, the synthetic offer (oracle + all
+candidates), the exact prompt and schema; the 12-page sample with run J's selection only in
+`.local/parity/` (git-ignored). Python freshness test in the backend job.
+
+**TS Worker:** compact path ported 1:1 (Unicode `\w`/`\b`/whitespace emulated, Python
+`finditer(pos, endpos)` semantics, code-point request limits, generated prompt). Parity: candidates
+with exact contexts, marked prompt and assembled results/invalid paths **identical on every case,
+including the 116 sample candidates** (89 parity tests; a deliberate WINDOW change makes 4 fail).
+Behaviour tests (14): health, CORS reject/preflight/headers, content type, declared and streamed
+body bound, 404/405, fail-closed limiters, 429 before parsing, malformed/inconsistent/extra-field/
+boolean-as-int/too-long/no-text/insufficient requests without AI, unsupported model or mode,
+server-owned metadata, exactly one correction, JSON-mode error correctable, provider errors not
+retried with numeric code only, quota, per-call timeout, insufficient content, logs without text.
+Known deviations: worker/README.md.
+
+**Performance (local workerd, fake AI with run-J selection, sample request 22 KB):**
+
+| Measurement | Python Worker | TS Worker |
 |---|---|---|
-| F-01 upload, F-02 extraction, F-06 errors/states, F-07 JSON export | yes, tested | yes (anonymous visitor checks, 2026-10-06) |
-| F-03 summary, F-04 key points, F-05 entities/amounts/dates | yes (compact, 70B) | **no** — accepted locally (runs I, J) and once with the deployed backend (K); the public run L timed out |
-| F-08 long documents | no — compact rejects > 30 000 characters (explicit 413); chunked unvalidated | no |
-| F-09 local history | yes (`abe5a21`, storage-full fix `127274b` not yet deployed) | partially: reopen/export with existing data verified publicly; storage-full fix pending deploy |
-| F-10 OCR | no (partial-analysis warning only) | no |
+| per request, warm (TS: full request path; Python: compact pipeline only) | 23.5 ms | **≈ 4.2 ms** |
+| first request after start | 72.6 ms (cold imports) | 42.1 ms first POST (module already initialised by a GET) |
+| bundle | 8 985 KiB / 2 234 KiB gzip | 1 077 KiB / 149 KiB gzip |
 
-## Stability checkpoint (docs/REVIEW_STABILITY.md)
+Local wall time is not Cloudflare CPU. Unmeasured: TS CPU on Cloudflare, module initialisation in
+isolation, the AI binding and timeout paths, cross-request isolate reuse. A TS deploy would need
+`wrangler tail` CPU checks on health/invalid requests first.
+
+**Model check:** `@cf/meta/llama-3.1-8b-instruct` is **absent** from the account catalogue
+(69 models; `wrangler ai models schema` → 6002 "Model schema not found"); only the incompatible
+`-fp8` variant exists. Recorded as a blocker; **0 provider calls** in this checkpoint; no other
+model tried.
+
+**Proposed next step (for review):** deploy the TS Worker with `cd worker && npx wrangler deploy`
+(same name, bindings and model; rollback `cd backend && uv run pywrangler deploy` or
+`npx wrangler rollback` to `a4695cc8`), measure CPU without AI, then ONE public sample analysis.
+The 70B latency risk (one public timeout at 40 s) is independent of the runtime and remains.
+
+## Stability checkpoint (docs/REVIEW_STABILITY.md) — previous snapshot follows
 
 **History:** with full storage the default browser path made history unavailable; failed
 deletions could be shown as done; a save that fit nothing removed the stored list. Fixed in
