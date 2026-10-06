@@ -1,0 +1,8 @@
+{
+  // LOCAL-ONLY CPU profiling of the TS request path with a fake AI (profile/entry.ts). Never deploy.
+  // Usage: npx wrangler dev --config wrangler.profile.jsonc --port 8791
+  "name": "pdf-insight-profile-ts-local",
+  "main": "profile/entry.ts",
+  "compatibility_date": "2026-10-05",
+  "alias": { "zod": "./node_modules/zod" }
+}

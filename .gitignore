@@ -19,3 +19,7 @@ pylock.toml
 
 # local profiling Worker copies the package before running
 backend/tools/workerd_profile/pdf_insight/
+
+# TS worker build output
+worker/dist/
+worker/.wrangler/
