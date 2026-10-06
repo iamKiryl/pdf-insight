@@ -151,12 +151,12 @@ def _is_header(line: str, above_row: bool = False) -> bool:
     return "|" in line or capitalised * 2 >= len(words) or (above_row and len(line) <= ROW_MAX)
 
 
-def _header_above(text: str, line_start: int) -> str | None:
+def _header_above(text: str, line_start: int, rows: dict[str, bool]) -> str | None:
     """The nearest column header above, unless a blank line, a numbered paragraph or a finished
     sentence comes first (the table ended there)."""
     below = text[line_start : _line_bounds(text, line_start)[1]]
     for line in _preceding_lines(text, line_start, HEADER_LINES):
-        if _is_header(line, above_row=_is_table_row(below)):
+        if _is_header(line, above_row=_is_table_row(below, rows)):
             return " ".join(line.split())
         if not line.strip() or _PARAGRAPH.match(line) or line.rstrip().endswith((".", "!", "?")):
             return None
@@ -171,9 +171,15 @@ def _heading_above(text: str, line_start: int) -> str | None:
     return None
 
 
-def _is_table_row(line: str) -> bool:
+def _is_table_row(line: str, rows: dict[str, bool] | None = None) -> bool:
     """A "|" separator, or at least two money/date cells with few words per cell and no sentence
-    break inside (a prose line that mentions two amounts is read as a sentence instead)."""
+    break inside (a prose line that mentions two amounts is read as a sentence instead).
+    ``rows`` memoises the answer per line for ONE request (header searches revisit the same lines;
+    measured as the main CPU cost). It is never module-level, so no text outlives the request."""
+    if rows is not None:
+        if line not in rows:
+            rows[line] = _is_table_row(line)
+        return rows[line]
     if "|" in line:
         return True
     if _SENTENCE_INSIDE.search(line):
@@ -199,7 +205,7 @@ def _occurrence(text: str, kind: str, start: int, end: int) -> tuple[int, int]:
 
 
 def _bounds(
-    text: str, start: int, end: int, wraps: list[tuple[int, int]]
+    text: str, start: int, end: int, wraps: list[tuple[int, int]], rows: dict[str, bool]
 ) -> tuple[int, int, str | None, bool, bool]:
     """Excerpt bounds in the page text, the bracketed header/heading and which sides were cut.
     A line that a wrapped number crosses is prose continuing on the next line, never a row."""
@@ -207,13 +213,13 @@ def _bounds(
     line = text[line_start:line_end]
     crossed = any(a < line_end < b or a < line_start - 1 < b for a, b in wraps)
     on_line = end <= line_end and not crossed
-    if on_line and _is_table_row(line):
-        return line_start, line_end, _header_above(text, line_start), False, False
+    if on_line and _is_table_row(line, rows):
+        return line_start, line_end, _header_above(text, line_start, rows), False, False
     if on_line and len(" ".join(line.split())) <= SHORT_LINE and ":" in text[line_start:start]:
         return line_start, line_end, _heading_above(text, line_start), False, False
     if on_line and len(line) <= ROW_MAX and not (_PARAGRAPH.match(line)
                                                   or _SENTENCE_INSIDE.search(line)):  # fmt: skip
-        header = _header_above(text, line_start)
+        header = _header_above(text, line_start, rows)
         sentence = line.rstrip().endswith(".") and len(line.split()) >= 8
         if header and not sentence:
             return line_start, line_end, header, False, False
@@ -246,9 +252,15 @@ def _fit(page: int, prefix: str | None, before: str, value: str, after: str,
 
 
 def _context(
-    text: str, page: int, kind: str, start: int, end: int, wraps: list[tuple[int, int]]
+    text: str,
+    page: int,
+    kind: str,
+    start: int,
+    end: int,
+    wraps: list[tuple[int, int]],
+    rows: dict[str, bool],
 ) -> str:
-    left, right, prefix, cut_left, cut_right = _bounds(text, start, end, wraps)
+    left, right, prefix, cut_left, cut_right = _bounds(text, start, end, wraps, rows)
     occ_start, occ_end = _occurrence(text, kind, start, end)
     occ_start, occ_end = max(left, occ_start), min(right, occ_end)
     before = _clean(text[left:occ_start])
@@ -317,10 +329,11 @@ def extract_candidates(request: AnalyzeRequest) -> list[Candidate]:
     found.sort(key=lambda f: (f[0], f[1]))
     texts = {p.page: p.text for p in request.pages}
     wraps = {p.page: [(a, b) for a, b, _ in _wraps(p.text)[0]] for p in request.pages}
+    rows: dict[str, bool] = {}  # per-request memo of line classification
     return [
         Candidate(
             id=i, kind=kind, page=page, start=start, end=end,  # type: ignore[arg-type]
-            context=_context(texts[page], page, kind, start, end, wraps[page]),
+            context=_context(texts[page], page, kind, start, end, wraps[page], rows),
             value=value, currency=currency, date=iso,
         )
         for i, (page, start, kind, value, currency, iso, end) in enumerate(found, start=1)
