@@ -9,6 +9,10 @@ organizations, people, amounts, dates, keywords) as validated JSON you can downl
 
 ## Public demo
 
+Status: published, **not yet accepted** — the single public analysis of the 12-page sample timed
+out at the 40 s model-call ceiling, and Worker CPU per request is above the Workers Free 10 ms
+limit (details: [docs/STATUS.md](docs/STATUS.md)).
+
 - **Demo:** https://iamkiryl.github.io/pdf-insight/ (intended to stay available for 14 days, until
   2026-10-20; availability is not certified in advance)
 - **Repository:** https://github.com/iamKiryl/pdf-insight
@@ -141,8 +145,9 @@ is automated later).
 
 - Latency: the 12-page sample took 25–26 s in three runs but the one public run timed out at the
   40 s model-call ceiling (AI_TIMEOUT); < 30 s is not guaranteed.
-- Worker CPU: 303 ms observed for one analyze request, above the 10 ms documented for Workers Free;
-  not rejected by the platform, compatibility unverified.
+- Worker CPU: above the 10 ms documented for Workers Free — 16–49 ms for requests that never reach
+  analysis, 303 ms for one analyze request (AI timeout); a local optimisation halves extraction
+  cost but the Python runtime itself exceeds the limit (see docs/STATUS.md).
 - Long documents (F-08): text above 30 000 characters is rejected with an explicit message (no
   truncation); OCR (F-10) is not implemented.
 - No OCR (F-10): image-only pages are reported, not read.

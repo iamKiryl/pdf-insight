@@ -612,3 +612,30 @@ analysis with an unobserved call count.
 The same document took 26.1 s (J) and ≈ 25 s (K) earlier the same morning; per-call latency of
 the 70B model varies enough to cross the 40 s ceiling. One run, not retried. Evidence:
 `.local/live/deployed/L-public-sample/summary.json`.
+
+# Stability checkpoint — 2026-10-06 (docs/REVIEW_STABILITY.md)
+
+## Model experiment `@cf/meta/llama-3.1-8b-instruct-fp8` (local override only)
+
+Catalog before calling (`wrangler ai models`): Text Generation, 32 000-token context, input
+schema lists `response_format` with `json_schema`, `{"response": …}` output. Production config
+untouched; `.dev.vars` override restored afterwards.
+
+| Run | Calls | Outcome | Duration | Tokens | Evidence |
+|---|---|---|---|---|---|
+| N — sample contract | 1 | provider error → AI_UNAVAILABLE (502); code not logged yet | call 384 ms, request 451 ms | none reported | `.local/live/tuning/N-8b-sample/` |
+| N2 — sample contract (after `3ff21cf`) | 1 | provider error **5025** → AI_UNAVAILABLE (502) | call 129 ms, request 172 ms | none reported | `.local/live/tuning/N2-8b-sample/` |
+
+5025 is not in the documented error table; the model is absent from the official JSON Mode list
+(https://developers.cloudflare.com/workers-ai/features/json-mode/), and third-party reports
+associate 5025 with this fp8 variant refusing JSON Schema. Verdict: incompatible with the compact
+contract; no quality or latency result exists; the synthetic offer was not run. 2 of 4 calls
+used. Own neuron accounting for the day ≈ 2 300 before these calls (none reported by them);
+actual usage unknown.
+
+## CPU evidence without AI
+
+See docs/STATUS.md (snapshot): CPython and local workerd profiles of the compact pipeline with a
+rebuilt run-J answer, and Cloudflare `wrangler tail` CPU for no-AI requests (health 6–18 ms,
+invalid full-size analyze 16–49 ms). Evidence: `.local/live/cpu-profile-*.txt`,
+`.local/live/workerd-profile-*.txt`, `.local/live/deployed/M-cpu-no-ai/summary.json`.

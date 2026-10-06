@@ -425,3 +425,24 @@ Compared saved candidate outputs: byte-identical. Read before/after workerd esti
 M CPU summaries. No saved 8B live evidence found; model registration alone does not verify it.
 Appended a follow-up to REVIEW_STABILITY.md to finish the existing task without duplicate calls.
 No AI calls or deployment by Codex.
+
+## 2026-10-06 — Stability checkpoint (Claude Code, Opus, subscription)
+
+Prompts (human → Claude, verbatim): «Выполни docs/REVIEW_STABILITY.md. Сначала исправь историю и
+исследуй CPU без AI-вызовов, затем проведи ограниченный эксперимент с указанной моделью. Не
+ослабляй проверки и не меняй production до ревью.» — interrupted, then: «Довыполни пункты 3–5
+docs/REVIEW_STABILITY.md с учётом Follow-up review. Если 8B уже запускалась — сохрани существующие
+результаты, не повторяй вызовы. Если нет — выполни предусмотренный эксперимент в оставшемся
+бюджете. Обнови STATUS и AI_LOG, запиши итоговое решение. Production пока не меняй.»
+
+- `127274b`: history readable on full storage; truthful failed state; no wipe on failed save
+  (regressions failed first: `.local/live/history-storage-before-fix.txt`).
+- `488927e`: profiled with a fake AI (CPython cProfile, then a local-only workerd Worker
+  `5dc4208`); per-request memo of line classification, outputs byte-identical. First local workerd
+  attempt failed because symlinked modules are not bundled — switched to a git-ignored copy.
+- Cloudflare CPU without AI via `wrangler tail`: health 6–18 ms, invalid full-size analyze
+  16–49 ms (three requests, no model calls).
+- 8B experiment: no prior run existed (checked `.local`). Call 1 failed with an unlogged provider
+  error; Claude added numeric-code logging (`3ff21cf`) and made call 2 → code 5025. Official JSON
+  Mode list excludes the fp8 model → reported as incompatible, profile reverted (`18d9b55`), no
+  other model tried, production unchanged. Decision recorded in docs/STATUS.md.

@@ -1,30 +1,74 @@
-# Current snapshot — 2026-10-06 (public demo checkpoint)
+# Current snapshot — 2026-10-06, 11:30 Warsaw (stability checkpoint)
+
+Deadline from the recruitment e-mail: 2026-10-06 14:44 Warsaw (docs/PLAN.md).
 
 | Item | State |
 |---|---|
-| Public demo | https://iamkiryl.github.io/pdf-insight/ — built from `85112f8` by CI run https://github.com/iamKiryl/pdf-insight/actions/runs/37428051869 (all five jobs passed) |
-| Repository | https://github.com/iamKiryl/pdf-insight (public, full history) |
-| Backend | https://pdf-insight-api.pdf-insight-api.workers.dev, Worker version `a4695cc8` built from `c775866` (no backend code change since), Workers Free, `AI_MODE=compact`, CORS `https://iamkiryl.github.io` |
-| Checks | frontend lint, format, typecheck, **102** Vitest tests, Pages build; backend Ruff and **439** pytest — locally and in CI |
-| Public live analysis (one allowed) | **failed: `AI_TIMEOUT`** — the single model call hit the 40 s ceiling (Worker wall 40.0 s, 504, clear Polish message with retry). Not retried by rule |
-| Earlier successful analyses | local I (offer 11.5 s), J (sample 26.2 s); deployed backend via local frontend K (25.3 s upload-to-render) — latency varies across runs; < 30 s is not guaranteed |
-| Worker CPU (observed with `wrangler tail`) | analyze request (timed out) **303 ms**, preflight 21 ms, health 6 ms. The Free plan documents 10 ms per request; the platform did not reject this request, but Free-plan CPU compatibility is **not verified** and is a release risk |
-| AI usage | own estimate ≈ 410 neurons per sample analysis; actual usage unknown |
-| Public UI checks (anonymous headless Chrome) | initial state, pdf.js worker (200), real file input upload, page-11 warning, non-PDF error, 360 px without horizontal scroll, history reopen from existing local data with **0 API requests**, JSON export identical to stored result |
+| Public demo | https://iamkiryl.github.io/pdf-insight/ — **published, not accepted**: the one public analysis timed out (AI_TIMEOUT, 40 s) |
+| Repository | https://github.com/iamKiryl/pdf-insight (public) |
+| Backend | https://pdf-insight-api.pdf-insight-api.workers.dev — version `a4695cc8` (70B, compact), **unchanged in this checkpoint** |
+| Local commits not deployed | `127274b` history storage fix, `488927e` CPU memo, `3ff21cf` provider error code in logs, `18d9b55` 8B profile removed |
+| Checks | frontend lint, format, typecheck, **107** Vitest tests, Pages build; backend Ruff, **441** pytest |
 
-| Requirement | State |
-|---|---|
-| F-01 – F-07 | implemented and tested (see history below for details) |
-| F-08 long documents | **open** — compact rejects > 30 000 characters with an explicit 413; `chunked` is an unvalidated experiment |
-| F-09 local history | **implemented** (`abe5a21`): ≤ 10 validated results + file metadata in localStorage, 1 000 000-char bound, corrupted/old entries skipped, unavailable/full storage reported, reopen without AI, delete one, clear all |
-| F-10 OCR | **open** — image-only pages produce the partial-analysis warning only |
+| Requirement | Implemented | Accepted on the public demo |
+|---|---|---|
+| F-01 upload, F-02 extraction, F-06 errors/states, F-07 JSON export | yes, tested | yes (anonymous visitor checks, 2026-10-06) |
+| F-03 summary, F-04 key points, F-05 entities/amounts/dates | yes (compact, 70B) | **no** — accepted locally (runs I, J) and once with the deployed backend (K); the public run L timed out |
+| F-08 long documents | no — compact rejects > 30 000 characters (explicit 413); chunked unvalidated | no |
+| F-09 local history | yes (`abe5a21`, storage-full fix `127274b` not yet deployed) | partially: reopen/export with existing data verified publicly; storage-full fix pending deploy |
+| F-10 OCR | no (partial-analysis warning only) | no |
 
-Release risks: model latency near or above 30 s on the 12-page sample (one public timeout), CPU
-above the documented Free limit, production rate limits per location only, 14-day availability
-(intended until 2026-10-20; cannot be certified in advance).
+## Stability checkpoint (docs/REVIEW_STABILITY.md)
 
-The sections below are dated checkpoint history; statements such as "nothing deployed" refer to
-their own dates, not to this snapshot.
+**History:** with full storage the default browser path made history unavailable; failed
+deletions could be shown as done; a save that fit nothing removed the stored list. Fixed in
+`127274b` with regressions through browserStorage/useHistory/App (two failed before the fix).
+
+**CPU (no AI calls), sample contract 22 KB / 116 candidates, fake model answer rebuilt from run J:**
+
+| Measurement | Before memo | After memo (`488927e`) |
+|---|---|---|
+| CPython: extract_candidates (warm) | 19.2 ms | 10.0 ms |
+| CPython: full POST through FastAPI/ASGI (warm / first) | 22.4 / 29.1 ms | 13.6 / 19.6 ms |
+| local workerd (Pyodide): pipeline per analysis | 41.6 ms | 23.5 ms |
+| local workerd: extraction | 38.1 ms | 20.3 ms |
+| local workerd: request validation | 0.1 ms | 0.1 ms |
+| local workerd: first request after start (cold imports) | 89.7 ms | 72.6 ms |
+| Cloudflare (deployed, before memo): GET /api/health | 6–18 ms CPU | — |
+| Cloudflare: POST full sample, invalid at validation (no extraction, no AI) | 16 / 29 / 49 ms CPU | — |
+| Cloudflare: POST analyze, AI timeout (run L) | 303 ms CPU, 40.0 s wall | — |
+
+Local workerd figures are client wall-time per repeated iteration, not Cloudflare CPU metrics;
+the fake answer skips the AI binding, JS↔Python conversion of the AI result and the timeout path.
+The hotspot was `_is_table_row` (496 calls for 116 candidates); remaining cost is spread over
+number/date parsing and contexts. Conclusion: **even a request that never reaches extraction
+costs 16–49 ms CPU on Cloudflare in the Python Worker (Pyodide + FastAPI + Pydantic), above the
+10 ms Free limit; extraction adds ~20 ms more.** Python optimisation alone cannot reach 10 ms.
+
+**Model experiment `@cf/meta/llama-3.1-8b-instruct-fp8` (local override, sample only):** two
+calls, both rejected before inference — first `provider_unavailable` after 384 ms (code not yet
+logged), second code **5025** after 129 ms (`3ff21cf` logs only the numeric code). The model is
+not in Cloudflare's JSON Mode list (only `@cf/meta/llama-3.1-8b-instruct` without fp8 is), and
+the compact contract requires `response_format: json_schema`. Verdict: **incompatible**; offer
+not run; 2 of 4 calls used; no tokens reported; profile removed (`18d9b55`). No other model tried.
+
+## Decision
+
+1. Production stays on the deployed 70B compact Worker until review.
+2. Proposed next deployment (behaviour-preserving, for review): backend at `18d9b55` with the same
+   config (70B, compact) — includes the CPU memo and numeric error codes; frontend at HEAD with the
+   storage-full history fix. It lowers CPU but does **not** make Free CPU compliant and does not
+   fix 70B latency (one public timeout).
+3. Architectural blocker: Python Workers CPU on Free. Smallest viable free alternative: a thin
+   TypeScript Worker with equivalent server-side validation — Zod schemas and limits already exist
+   in the frontend; port `numbers.py` (≈160 lines), `candidates.py` (≈330), the compact prompt,
+   selection validation and assembly (≈450), CORS/body limit/rate limiting (≈230) and the key
+   regression tests (numbers, contexts, names, markers, injection). Estimated 1–2 working days;
+   CPU must then be re-measured on Cloudflare. Not started.
+4. Model latency: a faster JSON-mode-compatible model must come from the official JSON Mode list
+   (e.g. `@cf/meta/llama-3.1-8b-instruct`, availability to be confirmed) — a separate, reviewed
+   experiment; not attempted here.
+5. F-08 (long documents) and F-10 (OCR) remain queued and incomplete.
 
 # History — dated checkpoints (oldest first)
 

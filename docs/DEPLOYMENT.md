@@ -1,7 +1,22 @@
-# Backend deployment — 2026-10-06
+# Deployment
 
-Backend Worker only. The frontend (GitHub Pages) and the public repository are **not** published
-yet; that is the next, separately authorised step.
+## Current state (2026-10-06, 11:30 Warsaw)
+
+| Item | State |
+|---|---|
+| Frontend | https://iamkiryl.github.io/pdf-insight/ (GitHub Pages, CI run 37428051869, commit `85112f8`; includes F-09 local history) |
+| Backend | https://pdf-insight-api.pdf-insight-api.workers.dev, version `a4695cc8` from `c775866`, 70B model, `AI_MODE=compact` — unchanged since the first deployment |
+| Not yet deployed | `127274b` (history storage fix, frontend), `488927e` (per-request memo, CPU), `3ff21cf` (numeric provider error code in logs) — waiting for review |
+| Production 429 | **observed** by Codex on 2026-10-06 ~06:59 UTC with invalid-body POSTs (no model calls); per-location and eventually consistent, not an exact cap |
+| CPU | observed with `wrangler tail`: analyze (timeout) 303 ms; no-AI requests 16–49 ms; health 6–18 ms — above the 10 ms Free limit (see "Stability checkpoint" in docs/STATUS.md) |
+| Public acceptance | not achieved: the one public analysis timed out (AI_TIMEOUT 40 s) |
+
+The sections below are dated records of each deployment step.
+
+# Backend deployment — 2026-10-06 (historical record)
+
+At the time of this section the frontend (GitHub Pages) and the public repository were not yet
+published (they were published later the same morning, see below).
 
 ## What is deployed
 
@@ -39,7 +54,7 @@ npx wrangler rollback                # if a release must be reverted
 | Preflight / POST from `https://evil.example` | 403 / 403 `ORIGIN_NOT_ALLOWED` |
 | POST from `http://localhost:5173` (current version) | 403 (temporary origin removed) |
 | POST without `Origin` | reaches validation (400 for an invalid body): by design CORS only restricts browsers; direct clients are limited by the rate limiters only |
-| Production 429 | **not verified** on Cloudflare (would spend analysis calls); 429 seen only in local workerd simulation and tests |
+| Production 429 | not verified at this step (later observed by Codex without model calls, see Current state) |
 
 ## Deployed analysis through the real frontend (one request)
 
@@ -59,7 +74,7 @@ temporarily), sample contract dropped as a file:
 Evidence (git-ignored): `.local/live/deployed/K-deployed-sample/` (exported result, metadata,
 evaluator report, AI review).
 
-## Remaining before release
+## Remaining before release (as of the backend deployment — items 2 and 3 since done)
 
 1. Read CPU time and errors for the deployed requests in the dashboard (user, logged in).
 2. Create the public repository, set repository variable
