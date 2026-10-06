@@ -473,3 +473,12 @@ Worker, сохрани контракт и защитные проверки, с
 - Local workerd profile with a fake AI: ≈ 4.2 ms per warm full request (Python pipeline 23.5 ms).
 - `54515a5`: CI worker job; push run and dispatch run green; frontend republished from `54515a5`
   (history fix). Backend production untouched.
+
+## 2026-10-06 — TS runtime review (Codex)
+
+User supplied Claude's completion report for 974d77d. Independently ran worker typecheck and 103
+tests; inspected HTTP/configuration, compact parsing/assembly, retry/deadline and parity harness.
+No blocker found in reviewed paths. Clarified parity compares rejection field paths, local sample
+is absent from CI, remote cancellation is not proven by Promise.race, and exact rollback needs a
+recorded version. Prepared REVIEW_TS_DEPLOY.md for controlled deployment and one quota-bounded
+public sample run. Codex made no AI calls or deployment.
