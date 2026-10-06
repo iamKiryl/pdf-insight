@@ -519,3 +519,66 @@ Evaluator status with this review: **failed** (`manual review failed: key_points
 ## Not done
 
 The synthetic offer (gate not met), any tuning after the call, default change, deployment.
+
+# Name fidelity and the synthetic offer — 2026-10-06 (docs/REVIEW_UI_AND_COMPACT_V2.md)
+
+**Result: the synthetic offer returned 200 in 14.0 s with one call and passed every automatic
+check (73/73, eval-v5), but internal candidate markers leaked into the summary and key points
+(language fidelity failed). The sample was therefore not repeated. Model calls used: 1 of 4.**
+
+## Reinterpretation of run G (historical verdict kept)
+
+Run G's manual review failed `key_points_factual` because the points repeat summary sentences.
+Per the review, the brief requires 3–7 factual key points and does not forbid overlap: the
+repetition is an editorial, nonblocking issue. The three points state different supported facts
+(the first also omits the signing date the summary gives). The recorded verdict and score stay
+as they were; under the current interpretation run G's remaining substantive defect is the name
+"Marek Zielińskiego" — a hybrid of "Marka Zielińskiego" (introduction) and "Marek Zieliński"
+(signature). Re-scored offline with eval-v5: 69/70, the name grounding check fails.
+
+## Changes before the call
+
+- `3fb0659`: every person name must occur in the source as written (NFC, case, whitespace and
+  line breaks normalised; any attested inflection accepted). Mixed or unknown names are invalid
+  output and use the existing single correction; nothing is rewritten or dropped; logged problems
+  carry the position only. Prompt `compact-v3-2026-10-06`.
+- `6737f8e`: eval-v5 adds "every person name is written in the source as given".
+- Offline: 436 backend tests, oracle passed on both cases.
+
+## Call (run H, synthetic offer)
+
+| Label | Attempt | Outcome | Duration | Tokens (in / out) | Finish | Output bytes |
+|---|---|---|---|---|---|---|
+| compact | 1 | ok | 13 911 ms | 1 784 / 509 | stop | 1 336 |
+
+Server 13 949 ms, client 13 978 ms (local). Own accounting for 2026-10-06 UTC ≈ 900 neurons
+(three calls); actual dashboard usage unknown. Evidence: `.local/live/tuning/H-compact-v3-offer/`.
+
+Automatic (eval-v5): 73/73 — metadata, coverage, type/language/date/title, both organisations
+with legal forms, "Joanna Wróbel" attested, all 11 amounts with qualifiers (29/29), all 6 dates,
+injection (no 0 EUR, no "free of charge"/"expired"), grounding, latency. The model selected
+exactly the 11 expected amounts and 6 expected dates.
+
+## Manual review (by Claude, an AI — not a human review)
+
+| Dimension | Verdict | Findings |
+|---|---|---|
+| summary_factual | pass | 3 supported sentences (offer, parties with legal forms, validity 31.10.2026, three terminals) |
+| key_points_factual | pass | 5 distinct supported points (scope; 96 000,00 zł netto / 118 080,00 zł brutto; penalty 400,00 zł per day capped at 20 000,00 zł; invoices 21 days; 24-month warranty); first overlaps the summary (editorial) |
+| contexts_meaning | pass | 17 source-quoted contexts with the right occurrence; the "Warszawa, dnia 4 września 2026 r." header is the offer's issue date (manual subcheck resolved) |
+| language_fidelity | **fail** | internal markers in user-visible text: "⟦D3⟧31 października 2026 r.", "⟦A5⟧96 000,00 zł", "⟦A7⟧…", "⟦A16⟧…", "⟦A17⟧…" |
+
+Status: **failed** (`manual review failed: language_fidelity`). Eval-v6 now also fails it
+automatically (73/74).
+
+## Fix after the call (offline, no further calls)
+
+`e2c20c4`: a marker copied right before its value is removed (our artefact — source brackets are
+replaced before marking, so a marker is never document content); any other marker in a text
+field is invalid output (single correction). Replaying run H's text: no marker left, wording
+otherwise unchanged. Prompt `compact-v4-2026-10-06`. `093f856`: eval-v6 check. 439 backend
+tests; oracle 70/70 and 73/73. Not verified live.
+
+## Not done
+
+The repeated sample run (offer failed), compact release preparation, deployment.

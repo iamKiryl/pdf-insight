@@ -51,18 +51,18 @@ Free-plan compatibility (CPU per request with FastAPI + Pydantic) is **still a h
 | Provider failure / timeout / quota | Done, tested (mocks) | pytest 502/503/504 mapping, error text classification |
 | No `any`, `console.log`, `dangerouslySetInnerHTML` | Enforced | ESLint rules (`no-explicit-any`, `no-console`, restricted JSX attribute); Vitest renders hostile markup as text |
 
-## Commands executed (all passed at the compact-correction checkpoint)
+## Commands executed (all passed at the name-fidelity checkpoint)
 
 ```
 backend$  uv run ruff check .            # All checks passed
 backend$  uv run ruff format --check .   # all files formatted
-backend$  uv run pytest -q               # 422 passed (377 before the compact correction, 96 in Stage 1)
-backend$  uv run python -m evaluation.oracle --case sample_contract --case synthetic_offer_pl   # PASS 68/68, 71/71
+backend$  uv run pytest -q               # 439 passed (422 before name fidelity, 96 in Stage 1)
+backend$  uv run python -m evaluation.oracle --case sample_contract --case synthetic_offer_pl   # PASS 70/70, 73/73
 backend$  uv lock --check                # lock up to date
 frontend$ npm run lint                   # 0 problems (--max-warnings=0)
 frontend$ npm run format:check           # all files formatted
 frontend$ npm run typecheck              # 0 errors
-frontend$ npm test                       # 81 passed (9 files)
+frontend$ npm test                       # 90 passed (10 files)
 frontend$ VITE_BASE_PATH=/pdf-insight/ npm run build   # ok; worker at /pdf-insight/assets/pdf.worker.min-*.mjs
 backend$  uv run pywrangler dev --config wrangler.smoke.jsonc   # workerd/Pyodide smoke, see below
 ```
@@ -207,25 +207,48 @@ failed key points (verbatim copies of the summary). Gate not met, synthetic offe
 (1 of 4 calls used). The model selects nearly every candidate (76/77 amounts, all dates).
 F-08 compact remains experimental; default `single`.
 
+## Compact name fidelity and offer trial — see docs/LIVE_AI_RESULTS.md
+
+`3fb0659`: person names must be written in the source (any attested inflection; mixed/unknown
+names use the single correction; logs carry positions only). `6737f8e`: eval-v5 grounds names
+(saved run G re-scored: "Marek Zielińskiego" flagged). Run G's key points: overlap with the
+summary is now an editorial, nonblocking issue (review reinterpretation; the historical verdict
+stays recorded). Live synthetic offer (run H, 1 call): 200 in 14.0 s, all 73 automatic checks,
+exact selection, injection excluded — but internal markers ("⟦A5⟧96 000,00 zł") leaked into the
+summary and key points: language fidelity failed, so the sample was not repeated (1 of 4 calls).
+`e2c20c4` removes markers copied before their value and treats any other marker as invalid
+output; `093f856` (eval-v6) fails leaked markers. Not re-measured live yet.
+
 ## Release gates still open
 
-- Latency: every 70B call so far took 30.1–35.4 s locally (inputs 1.8k–9.4k tokens); <30 s
-  upload-to-result is not met and must be re-measured on the deployed Worker. Failure ceilings
-  are now 40 s per call / 55 s per request / 65 s in the browser.
-- Completeness on long documents (sample 44/65 under evaluator v3): budget, rejected offer, share capitals,
-  invoice/payment/annex dates and qualifiers; Polish character fidelity in model output.
-- Additional real PDFs (other languages/types), not only the sample and one synthetic offer.
-- CPU time per request on Workers Free (not measurable locally); ≈ 406 neurons per 70B analysis of
-  the sample (fewer than 25 per day on the free allocation).
-- Rate limiting behaviour on Cloudflare (bindings deployed, 429 observed).
-- GitHub Pages live URL, refresh, pdf.js worker load (`.mjs` MIME), screenshot, 14-day availability.
-- Multi-column extraction meaning preservation on the supplied PDF (review note).
+Measurements are local (`pywrangler dev`), never deployed.
+
+| Gate | Old single mode (default `AI_MODE=single`) | Current compact mode (experimental) |
+|---|---|---|
+| Latency < 30 s | 30.1–35.4 s per sample call — not met | sample 22.6 s / 23.8 s, offer 14.0 s (one call each) — met locally only |
+| Factual completeness | sample 44/65 (eval-v3) | sample 69/69 (eval-v4), offer 73/73 (eval-v5) automatic; manual: run G key points (editorial) and name defect, run H marker leak (fixed, not re-measured) |
+| Names and narrative fidelity | not systematically checked | name grounding + marker check now enforced; needs one clean live pass on each case |
+
+Open for both / delivery:
+- Re-run the offer and then the sample in compact mode (≤ 4 calls) after review of `e2c20c4`.
+- Deployed upload-to-render latency (< 30 s), Workers Free CPU per request (not measurable
+  locally), actual AI usage (≈ 410 neurons per sample analysis by own estimate; dashboard usage
+  unknown), CORS from the Pages origin, rate limiting on Cloudflare (bindings exist, 429 seen only
+  locally).
+- GitHub Pages live URL, refresh, pdf.js worker (`.mjs` MIME), screenshot, 14-day availability.
+- Model selects nearly every candidate on the long sample (verbose, repeated amounts); people
+  list incomplete on the sample (completeness limitation, separate from name fidelity).
+- Two-column lines and whitespace tables: values kept but ownership/column mapping left to the
+  reader.
+- Additional real PDFs (other languages/types).
+- F-08 accepted only if compact passes; unvalidated `chunked` does not count. **F-09 local history
+  and F-10 OCR are not implemented.**
 
 ## Next steps (proposed)
 
-1. Codex review of the tuning checkpoint: decide on page-based chunk extraction + deterministic
-   merge (F-08) or another model comparison; then deploy the backend and measure production CPU
-   and latency.
+1. Codex review of `e2c20c4`/`093f856`; then the offer and the sample in compact mode
+   (≤ 4 calls). Only if both pass: compact as the proposed release mode, backend deployment and
+   live CPU/CORS/rate-limit/upload-to-render checks.
 2. Tune prompt/model only from measured failures; record in AI_LOG.md.
 3. GitHub repo + Pages deploy via manual workflow; README demo link and screenshot.
 4. SHOULD: F-08 chunking (page-based, merge + dedupe), F-09 local history. COULD: F-10 OCR for

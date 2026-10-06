@@ -340,3 +340,19 @@ UI-коммит, проверь desktop и 360px, сохрани скриншо�
   hand-made fixture with long contexts, slow and 503 modes): idle, ready + partial warning, loading,
   error, result; no horizontal page scroll; visible keyboard focus. Screenshots saved with headless
   Chrome (fresh temporary profile, localhost only) to `docs/screenshots/`. No live AI calls.
+
+## 2026-10-06 — Name fidelity and offer checkpoint (Claude Code, Opus, subscription)
+
+Prompt (human → Claude, verbatim): «Выполни docs/REVIEW_UI_AND_COMPACT_V2.md. Оформление принято.
+Исправь точность имён по исходному тексту. Пересечение keyPoints с summary само по себе не считать
+ошибкой. Затем проверь второй документ и, при успехе, повтори договор. Максимум 4 вызова с учётом
+коррекций. Если оба проходят — подготовь compact к деплою. Без новых архитектурных экспериментов.»
+
+- `3fb0659`, `6737f8e`: name attestation at runtime (single correction) and in the evaluator.
+  First draft put the offending name into the validation problem text, which is logged — changed
+  to the list position before committing (logs must not contain document text).
+- Live offer (run H): 14.0 s, 73/73 automatic, but the model copied "⟦A5⟧"-style markers into
+  the summary and key points; neither the runtime nor the evaluator checked for that (Claude's
+  omission). Stopped live calls (1 of 4 used); fixed offline (`e2c20c4`, `093f856`), replayed the
+  saved text through the fix. Manual review by Claude (AI), not a human.
+- Run G's key-point verdict reinterpreted as editorial per the review; historical record kept.
