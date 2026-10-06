@@ -523,3 +523,11 @@ Prompt (human → Claude, verbatim): «Выполни docs/NEXT_CPU_CHECK.md. Н
   model call 30.2 s), CPU 39 ms (no production gain observed), 70/71, review pass. Not repeated.
 - Found that runs P and Q reused a leftover headless Chrome from run L (Claude's script did not
   ensure the old process had exited); recorded the correction and closed the processes.
+
+## 2026-10-06 — Next-step latency decision (Codex)
+
+User: «тогда что делаем дальше ?». Checked clock (12:24 Warsaw) and prior Gemma trial: old full
+extraction schema, truncated at 2048 tokens; no compact-mode Gemma trial recorded. Verified official
+model card exists. Prepared NEXT_MODEL_COMPACT.md for one bounded compact comparison, conditional
+adapter/deployment only after both existing evaluation cases pass. CPU risk remains separate.
+No inference, model switch or deployment by Codex.
