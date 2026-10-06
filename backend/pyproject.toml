@@ -37,4 +37,4 @@ known-first-party = ["pdf_insight", "evaluation"]
 "evaluation/run_live.py" = ["T201", "S310"]  # local CLI: prints a report, opens a localhost URL
 "evaluation/rescore.py" = ["T201"]
 "evaluation/oracle.py" = ["T201"]
-"tools/*.py" = ["T201"]  # local profiling CLIs
+"tools/*.py" = ["T201", "E402"]  # local CLIs: print reports, extend sys.path before imports  # local profiling CLIs

@@ -25,18 +25,18 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "tests")]
 
-from conftest import ORIGIN, FakeAI, make_client  # noqa: E402
-from pdf_insight.analyzer import _parse_payload  # noqa: E402
-from pdf_insight.candidates import extract_candidates  # noqa: E402
-from pdf_insight.compact import (  # noqa: E402
+from conftest import ORIGIN, FakeAI, make_client
+from pdf_insight.analyzer import _parse_payload
+from pdf_insight.candidates import extract_candidates
+from pdf_insight.compact import (
     OUTPUT_SCHEMA,
     assemble,
     build_messages,
     parse_selection,
 )
-from pdf_insight.config import load_settings  # noqa: E402
-from pdf_insight.contract import AnalyzeRequest  # noqa: E402
-from pdf_insight.models import build_inputs, profile_for  # noqa: E402
+from pdf_insight.config import load_settings
+from pdf_insight.contract import AnalyzeRequest
+from pdf_insight.models import build_inputs, profile_for
 
 
 def selection_from_result(result: dict, candidates: list) -> dict:
